@@ -3,23 +3,22 @@ pragma solidity ^0.8.20;
 
 import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
 import {IERC20} from "../lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
-import {IERC20Metadata} from "../lib/openzeppelin-contracts/contracts/interfaces/IERC20Metadata.sol";
 import {SafeERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract BlockSheep is Ownable {
     using SafeERC20 for IERC20;
 
-    uint8 private constant NUM_OF_PLAYERS_PER_RACE = 9;
+    uint8 private constant NUM_OF_PLAYERS_PER_RACE = 3;
     uint64 private constant MIN_SECONDS_BEFORE_START_RACE = 1 hours;
     uint64 private constant GAME_DURATION = 5 * 60;
 
-    IERC20 public immutable underlying;
-    uint256 public immutable cost;
+    IERC20 public immutable UNDERLYING;
+    uint256 public immutable COST;
 
     mapping(address => uint256) public balances;
     uint256 public feeCollected;
     // questionId => question
-    mapping(uint256 => QuestionInfo) questions;
+    mapping(uint256 => QuestionInfo) public questions;
 
     uint256 private nextQuestionId;
 
@@ -41,19 +40,18 @@ contract BlockSheep is Ownable {
         uint256 questionId;
         bool draw;
         bool distributed;
+        uint8 answeredPlayersCount;
         // answerId => count;
         mapping(uint8 => address[]) playersByAnswer;
+        mapping(address => bool) answered;
     }
 
     struct Game {
         uint256 gameId;
         uint64 endAt;
         uint8 numOfQuestions;
-        uint8 answeredPlayersCount;
-        bool distributed;
         // questionIndex => Question
         mapping(uint8 => Question) questions;
-        mapping(address => bool) answered;
         mapping(address => uint256) scoreByAddress;
     }
 
@@ -95,65 +93,57 @@ contract BlockSheep is Ownable {
         address owner,
         uint256 _cost
     ) Ownable(owner) {
-        underlying = IERC20(_underlying);
-        cost = _cost;
+        UNDERLYING = IERC20(_underlying);
+        COST = _cost;
     }
 
     function deposit(uint256 amount) external {
         balances[msg.sender] += amount;
-        underlying.safeTransferFrom(msg.sender, address(this), amount);
+        UNDERLYING.safeTransferFrom(msg.sender, address(this), amount);
     }
 
     function withdraw(uint256 amount) external {
         balances[msg.sender] -= amount;
-        underlying.safeTransfer(msg.sender, amount);
+        UNDERLYING.safeTransfer(msg.sender, amount);
     }
 
     function register(uint256 raceId) external {
         Race storage race = races[raceId];
-        if (raceId < nextRaceId) revert InvalidRaceId();
-        if (block.timestamp < race.startAt) revert InvalidTimestamp();
+        if (raceId >= nextRaceId) revert InvalidRaceId();
+        if (block.timestamp > race.startAt) revert InvalidTimestamp();
         if (race.playerRegistered[msg.sender]) revert AlreadyRegistered();
         if (race.playersCount >= NUM_OF_PLAYERS_PER_RACE) revert RaceIsFull();
-        balances[msg.sender] -= race.numOfQuestions * cost;
+        balances[msg.sender] -= race.numOfQuestions * COST;
         race.playerRegistered[msg.sender] = true;
         race.playersCount++;
     }
 
-    function submitAnswers(
+    function submitAnswer(
         uint256 raceId,
         uint8 gameIndex,
-        uint8[] memory answerIds
+        uint8 qIndex,
+        uint8 aId
     ) external {
         validateRaceId(raceId);
         validateGameIndex(raceId, gameIndex);
         Game storage game = races[raceId].games[gameIndex];
-        if (game.numOfQuestions != answerIds.length) revert LengthMismatch();
+        Question storage question = game.questions[qIndex];
         if (block.timestamp > game.endAt) revert Timeout();
-        if (game.answered[msg.sender]) revert AlreadyAnswered();
-        game.answered[msg.sender] = true;
-        game.answeredPlayersCount++;
-        for (uint8 i = 0; i < answerIds.length; i++) {
-            uint8 answerId = answerIds[i];
-
-            game.questions[i].playersByAnswer[answerId].push(msg.sender);
-            // game.playersByAnswer[questionId][answerId].push(msg.sender);
-        }
+        if (question.answered[msg.sender]) revert AlreadyAnswered();
+        question.answered[msg.sender] = true;
+        question.answeredPlayersCount++;
+        question.playersByAnswer[aId].push(msg.sender);
     }
 
-    function distributReward(uint256 raceId, uint8 gameIndex) external {
+    function distributeReward(
+        uint256 raceId,
+        uint8 gameIndex,
+        uint8 qIndex
+    ) external {
         validateRaceId(raceId);
         validateGameIndex(raceId, gameIndex);
         Game storage game = races[raceId].games[gameIndex];
-        _distributeRewardOfGame(game);
-    }
-
-    function _distributeRewardOfGame(Game storage game) internal {
-        if (game.distributed) revert AlreadyDistributed();
-        uint256 length = game.numOfQuestions;
-        for (uint8 i = 0; i < length; i++) {
-            _distributeRewardOfQuestion(game, i);
-        }
+        _distributeRewardOfQuestion(game, qIndex);
     }
 
     function _distributeRewardOfQuestion(
@@ -163,7 +153,7 @@ contract BlockSheep is Ownable {
         Question storage question = game.questions[questionIndex];
         uint8 minAnswerId = _getWinningAnswerIdOfQuestion(question);
         for (
-            uint j = 0;
+            uint256 j = 0;
             j < question.playersByAnswer[minAnswerId].length;
             j++
         ) {
@@ -198,13 +188,20 @@ contract BlockSheep is Ownable {
     }
 
     /// Admin functions
-    function addQuestion(
-        string memory question,
-        string[] memory answers
-    ) external onlyOwner {
+    function addQuestion(QuestionInfo memory params) external onlyOwner {
+        _addQuestion(params);
+    }
+
+    function addQuestions(QuestionInfo[] memory _questions) external onlyOwner {
+        for (uint256 index = 0; index < _questions.length; index++) {
+            _addQuestion(_questions[index]);
+        }
+    }
+
+    function _addQuestion(QuestionInfo memory params) internal {
         QuestionInfo storage _question = questions[nextQuestionId];
-        _question.content = question;
-        _question.answers = answers;
+        _question.content = params.content;
+        _question.answers = params.answers;
         nextQuestionId++;
     }
 
@@ -224,9 +221,10 @@ contract BlockSheep is Ownable {
         Race storage _race = races[nextRaceId];
         _race.name = name;
         _race.startAt = startAt;
+        _race.numOfGames = uint8(games.length);
         uint64 endAt = startAt;
         uint8 _numOfQuestions = 0;
-        for (uint i = 0; i < games.length; i++) {
+        for (uint256 i = 0; i < games.length; i++) {
             _race.games[i].gameId = games[i].gameId;
             _race.games[i].numOfQuestions = uint8(games[i].questionIds.length);
             for (uint8 j = 0; j < games[i].questionIds.length; j++) {
@@ -243,5 +241,36 @@ contract BlockSheep is Ownable {
         _race.numOfQuestions = _numOfQuestions;
 
         nextRaceId++;
+    }
+
+    function getQuestions(
+        uint256 id
+    ) public view returns (QuestionInfo memory) {
+        return questions[id];
+    }
+
+    function getGameNames(uint256 id) public view returns (string memory) {
+        return gameNames[id];
+    }
+
+    function getRaces(
+        uint256 id
+    )
+        public
+        view
+        returns (
+            string memory name,
+            uint64 startAt,
+            uint8 numOfGames,
+            uint8 numOfQuestions,
+            uint8 playersCount
+        )
+    {
+        Race storage race = races[id];
+        name = race.name;
+        startAt = race.startAt;
+        numOfGames = race.numOfGames;
+        numOfQuestions = race.numOfQuestions;
+        playersCount = race.playersCount;
     }
 }
