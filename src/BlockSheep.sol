@@ -9,7 +9,7 @@ contract BlockSheep is Ownable {
     using SafeERC20 for IERC20;
 
     uint8 private constant NUM_OF_PLAYERS_PER_RACE = 3;
-    uint64 private constant MIN_SECONDS_BEFORE_START_RACE = 1 hours;
+    uint64 private constant MIN_SECONDS_BEFORE_START_RACE = 5 minutes;
     uint64 private constant GAME_DURATION = 5 * 60;
 
     IERC20 public immutable UNDERLYING;
@@ -29,7 +29,7 @@ contract BlockSheep is Ownable {
 
     mapping(uint256 => Race) private races;
 
-    uint256 private nextRaceId;
+    uint256 public nextRaceId;
 
     struct QuestionInfo {
         string content;
@@ -61,6 +61,7 @@ contract BlockSheep is Ownable {
     }
 
     enum RaceStatus {
+        NON_EXIST,
         CREATED,
         STARTED,
         CANCELLED,
@@ -77,6 +78,16 @@ contract BlockSheep is Ownable {
         mapping(address => bool) playerRegistered;
     }
 
+    struct RaceInfo {
+        string name;
+        uint64 startAt;
+        uint8 numOfGames;
+        uint8 numOfQuestions;
+        uint8 playersCount;
+        bool registered;
+        RaceStatus status;
+    }
+
     error InvalidTimestamp();
     error EmptyQuestions();
     error InvalidRaceId();
@@ -87,6 +98,8 @@ contract BlockSheep is Ownable {
     error AlreadyDistributed();
     error AlreadyRegistered();
     error RaceIsFull();
+
+    event Registered(address user, uint256 amount);
 
     constructor(
         address _underlying,
@@ -116,6 +129,8 @@ contract BlockSheep is Ownable {
         balances[msg.sender] -= race.numOfQuestions * COST;
         race.playerRegistered[msg.sender] = true;
         race.playersCount++;
+
+        emit Registered(msg.sender, race.numOfQuestions * COST);
     }
 
     function submitAnswer(
@@ -175,7 +190,8 @@ contract BlockSheep is Ownable {
             i++
         ) {
             uint256 count = question.playersByAnswer[i].length;
-            if (count < minAnswerId) minAnswerId = uint8(count);
+
+            if (count < minAnswerId) minAnswerId = i;
         }
     }
 
@@ -272,5 +288,48 @@ contract BlockSheep is Ownable {
         numOfGames = race.numOfGames;
         numOfQuestions = race.numOfQuestions;
         playersCount = race.playersCount;
+    }
+
+    function getScoreAtGameOfUser(
+        uint256 raceId,
+        uint256 gameIndex,
+        address user
+    ) external view returns (uint256) {
+        return races[raceId].games[gameIndex].scoreByAddress[user];
+    }
+
+    function getRacesWithPagination(
+        address user,
+        uint256 from,
+        uint256 to
+    ) external view returns (RaceInfo[] memory) {
+        require(from < nextRaceId, "From index out of bounds");
+        require(from < to, "To index must be greater than from index");
+
+        if (to > nextRaceId) {
+            to = nextRaceId;
+        }
+        uint256 length = to - from;
+        RaceInfo[] memory _races = new RaceInfo[](length);
+        for (uint256 index = 0; index < length; index++) {
+            Race storage race = races[index];
+            _races[index].name = race.name;
+            _races[index].startAt = race.startAt;
+            _races[index].numOfGames = race.numOfGames;
+            _races[index].numOfQuestions = race.numOfQuestions;
+            _races[index].playersCount = race.playersCount;
+            _races[index].registered = race.playerRegistered[user];
+        }
+        return _races;
+    }
+
+    function getRaceStatus(uint256 raceId) external view returns (RaceStatus) {
+        if (raceId > nextRaceId) return RaceStatus.NON_EXIST;
+        Race storage race = races[raceId];
+        if (race.startAt < block.timestamp) return RaceStatus.CREATED;
+        if (race.playersCount < NUM_OF_PLAYERS_PER_RACE)
+            return RaceStatus.CANCELLED;
+
+        return RaceStatus.STARTED;
     }
 }

@@ -30,6 +30,8 @@ lint :; solhint src/**/*.sol && solhint src/*.sol
 
 anvil :; anvil -m 'test test test test test test test test test test test junk'
 
+script-arb-sepolia :; @forge script script/${contract}.s.sol:${contract} --rpc-url ${ARBITRUM_SEPOLIA_ALCHEMY_URL}  --broadcast -vvvv
+
 deploy-arb-sepolia :; @forge script script/${contract}.s.sol:Deploy${contract} --rpc-url ${ARBITRUM_SEPOLIA_ALCHEMY_URL}  --private-key ${PRIVATE_KEY} --broadcast --verify --verifier-url https://api-sepolia.arbiscan.io/api --etherscan-api-key ${ETHERSCAN_API_KEY} -vvvv
 # use the "@" to hide the command from your shell 
 deploy-sepolia :; @forge script script/${contract}.s.sol:Deploy${contract} --rpc-url ${SEPOLIA_RPC_URL}  --private-key ${PRIVATE_KEY} --broadcast --verify --etherscan-api-key ${ETHERSCAN_API_KEY}  -vvvv

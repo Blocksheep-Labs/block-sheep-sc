@@ -77,4 +77,16 @@ contract BlockSheepTest is Test {
         blockSheep.register(raceId);
         vm.stopPrank();
     }
+
+    function submitAnswer(
+        address user,
+        uint256 raceId,
+        uint8 gameIndex,
+        uint8 qIndex,
+        uint8 aId
+    ) internal {
+        vm.startPrank(user);
+        blockSheep.submitAnswer(raceId, gameIndex, qIndex, aId);
+        vm.stopPrank();
+    }
 }
