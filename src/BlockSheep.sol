@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: SEE LICENSE IN LICENSE
 pragma solidity ^0.8.20;
 
-import {Ownable} from "../lib/openzeppelin-contracts/contracts/access/Ownable.sol";
-import {IERC20} from "../lib/openzeppelin-contracts/contracts/interfaces/IERC20.sol";
-import {SafeERC20} from "../lib/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
+import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
+import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 
 contract BlockSheep is Ownable {
     using SafeERC20 for IERC20;
@@ -196,7 +196,7 @@ contract BlockSheep is Ownable {
     }
 
     function validateRaceId(uint256 raceId) internal view {
-        if (raceId >= nextQuestionId) revert InvalidRaceId();
+        if (raceId >= nextRaceId) revert InvalidRaceId();
     }
 
     function validateGameIndex(uint256 raceId, uint8 gameIndex) internal view {

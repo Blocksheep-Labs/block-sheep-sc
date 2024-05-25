@@ -8,15 +8,13 @@
         "src/**/*.sol"
     ],
     "devDependencies": {
-        "prettier": "^2.7.1",
-        "prettier-plugin-solidity": "^1.0.0-beta.19",
         "@nomicfoundation/hardhat-chai-matchers": "^2.0.0",
         "@nomicfoundation/hardhat-ethers": "^3.0.0",
         "@nomicfoundation/hardhat-foundry": "^1.1.1",
         "@nomicfoundation/hardhat-network-helpers": "^1.0.0",
         "@nomicfoundation/hardhat-toolbox": "^4.0.0",
         "@nomicfoundation/hardhat-verify": "^2.0.0",
-        "@openzeppelin/contracts": "^5.0.1",
+        "@openzeppelin/contracts": "^5.0.2",
         "@typechain/ethers-v6": "^0.5.0",
         "@typechain/hardhat": "^9.0.0",
         "@types/chai": "^4.2.0",
@@ -30,6 +28,8 @@
         "hardhat-deploy": "^0.12.1",
         "hardhat-deploy-ethers": "^0.4.1",
         "hardhat-gas-reporter": "^1.0.8",
+        "prettier": "^2.7.1",
+        "prettier-plugin-solidity": "^1.0.0-beta.19",
         "solidity-coverage": "^0.8.0",
         "ts-node": ">=8.0.0",
         "typechain": "^8.3.0",
@@ -49,6 +49,7 @@
         "snapshot": "make snapshot",
         "format": "make format",
         "lint": "make lint",
-        "all": "make all"
+        "all": "make all",
+        "test-hardhat": "npx hardhat test"
     }
 }

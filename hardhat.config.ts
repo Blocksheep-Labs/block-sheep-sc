@@ -27,7 +27,10 @@ const config: HardhatUserConfig = {
             },
         ],
     },
+    defaultNetwork: "hardhat",
     networks: {
+        "hardhat":{
+        },
         "arbitrum-sepolia": {
             url: ARBITRUM_SEPOLIA_ALCHEMY_URL,
             accounts: [DEPLOYER],
