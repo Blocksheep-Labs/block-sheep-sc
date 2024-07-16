@@ -1,7 +1,7 @@
 pragma solidity ^0.8.20;
 
 import {BlockSheep} from "src/BlockSheep.sol";
-import {BlockSheepTest} from "test/BlockSheep.t.sol";
+import {BlockSheepTest} from "test/contracts/BlockSheep.t.sol";
 
 contract AddRaceTest is BlockSheepTest {
     function setUp() public override {

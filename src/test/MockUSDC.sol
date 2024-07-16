@@ -17,4 +17,9 @@ contract MockUSDC is ERC20 {
         _mint(msg.sender, amount);
         return amount;
     }
+
+    function mint(address to, uint256 amount) public returns(uint256) {
+        _mint(to, amount);
+        return amount;
+    }
 }
