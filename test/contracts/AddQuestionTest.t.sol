@@ -13,10 +13,10 @@ contract AddQuestionTest is BlockSheepTest {
         );
         vm.stopPrank();
 
-        BlockSheep.QuestionInfo memory questionInfo = blockSheep.getQuestions(
+        string memory questionInfo = blockSheep.questions(
             0
         );
-        assertEq(questionInfo.content, question);
+        assertEq(questionInfo, question);
     }
 
     function test_RevertWhen_CallerIsNotOwner() public {
