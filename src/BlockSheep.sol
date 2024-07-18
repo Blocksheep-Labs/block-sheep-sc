@@ -119,12 +119,12 @@ contract BlockSheep is Ownable {
 
     function deposit(uint256 amount) external {
         balances[msg.sender] += amount;
-        UNDERLYING.safeTransferFrom(msg.sender, address(this), amount);
+        //UNDERLYING.safeTransferFrom(msg.sender, address(this), amount);
     }
 
     function withdraw(uint256 amount) external {
         balances[msg.sender] -= amount;
-        UNDERLYING.safeTransfer(msg.sender, amount);
+        //UNDERLYING.safeTransfer(msg.sender, amount);
     }
 
     function register(uint256 raceId) external {
