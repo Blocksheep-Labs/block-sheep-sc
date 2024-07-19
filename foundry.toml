@@ -10,6 +10,7 @@ fs_permissions = [
 ]
 evm_version = 'shanghai'
 
+
 # Remappings in remappings.txt
 remappings = ['@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/']
 # See more config options https://github.com/gakonst/foundry/tree/master/config

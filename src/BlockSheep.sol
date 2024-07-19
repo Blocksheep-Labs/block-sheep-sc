@@ -81,6 +81,7 @@ contract BlockSheep is Ownable {
         uint8 playersCount;
         mapping(uint256 => Game) games;
         mapping(address => bool) playerRegistered;
+        mapping(address => uint256[]) racesCompleted;
     }
 
     struct RaceInfo {
@@ -92,6 +93,8 @@ contract BlockSheep is Ownable {
         bool registered;
         RaceStatus status;
         uint256[] games;
+        uint256[] racesCompletedPerUser;
+        uint256 raceDuration;
     }
 
 
@@ -313,7 +316,9 @@ contract BlockSheep is Ownable {
             uint8 numOfGames,
             uint8 numOfQuestions,
             uint8 playersCount,
-            uint256[] memory games
+            uint256[] memory games,
+            uint256[] memory racesCompletedPerUser,
+            uint256 raceDuration
         )
     {
         Race storage race = races[id];
@@ -330,6 +335,10 @@ contract BlockSheep is Ownable {
         for (uint8 i = 0; i < race.numOfGames; i++) {
             games[i] = race.games[i].gameId;
         }
+
+        racesCompletedPerUser = race.racesCompleted[msg.sender];
+
+        raceDuration = GAME_DURATION * race.numOfGames;
     }
 
     function getScoreAtGameOfUser(
@@ -370,6 +379,10 @@ contract BlockSheep is Ownable {
                 games[i] = race.games[i].gameId;
             }
             _races[index].games = games;
+
+            _races[index].racesCompletedPerUser = race.racesCompleted[msg.sender];
+
+            _races[index].raceDuration = GAME_DURATION * race.numOfGames;
         }
         return _races;
     }
