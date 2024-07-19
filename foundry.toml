@@ -8,6 +8,7 @@ optimizer_runs = 20000
 fs_permissions = [
   { access = "read", path = "lib/foundry-chainlink-toolkit/out" },
 ]
+evm_version = 'shanghai'
 
 # Remappings in remappings.txt
 remappings = ['@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/']

@@ -36,6 +36,11 @@ contract BlockSheep is Ownable {
         string[] answers;
     }
 
+    struct QuestionInfoReturnType {
+        uint256 id;
+        QuestionInfo info;
+    }
+
     struct Question {
         uint256 questionId;
         bool draw;
@@ -86,7 +91,9 @@ contract BlockSheep is Ownable {
         uint8 playersCount;
         bool registered;
         RaceStatus status;
+        uint256[] games;
     }
+
 
     error InvalidTimestamp();
     error EmptyQuestions();
@@ -112,12 +119,12 @@ contract BlockSheep is Ownable {
 
     function deposit(uint256 amount) external {
         balances[msg.sender] += amount;
-        UNDERLYING.safeTransferFrom(msg.sender, address(this), amount);
+        //UNDERLYING.safeTransferFrom(msg.sender, address(this), amount);
     }
 
     function withdraw(uint256 amount) external {
         balances[msg.sender] -= amount;
-        UNDERLYING.safeTransfer(msg.sender, amount);
+        //UNDERLYING.safeTransfer(msg.sender, amount);
     }
 
     function register(uint256 raceId) external {
@@ -260,10 +267,27 @@ contract BlockSheep is Ownable {
     }
 
     function getQuestions(
-        uint256 id
-    ) public view returns (QuestionInfo memory) {
-        return questions[id];
+        uint256 raceId,
+        uint256 gameId
+    ) public view returns (QuestionInfoReturnType[] memory) {
+        uint256 length = races[raceId].games[gameId].numOfQuestions;
+
+        // Initialize an array to store QuestionInfoReturnType structs
+        QuestionInfoReturnType[] memory questionsInfo = new QuestionInfoReturnType[](length);
+
+        // Populate the questionsInfo array
+        for (uint8 i = 0; i < length; i++) {
+            uint256 questionId = races[raceId].games[gameId].questions[i].questionId;
+            questionsInfo[i] = QuestionInfoReturnType({
+                id: questionId,
+                info: questions[questionId]
+            });
+        }
+
+        // Return the populated questionsInfo array
+        return questionsInfo;
     }
+
 
     function getGameNames(uint256 id) public view returns (string memory) {
         return gameNames[id];
@@ -279,7 +303,8 @@ contract BlockSheep is Ownable {
             uint64 startAt,
             uint8 numOfGames,
             uint8 numOfQuestions,
-            uint8 playersCount
+            uint8 playersCount,
+            uint256[] memory games
         )
     {
         Race storage race = races[id];
@@ -288,6 +313,14 @@ contract BlockSheep is Ownable {
         numOfGames = race.numOfGames;
         numOfQuestions = race.numOfQuestions;
         playersCount = race.playersCount;
+
+        // Initialize an array to store gameIds
+        games = new uint256[](race.numOfGames);
+        
+        // Populate the games array with gameIds
+        for (uint8 i = 0; i < race.numOfGames; i++) {
+            games[i] = race.games[i].gameId;
+        }
     }
 
     function getScoreAtGameOfUser(
@@ -319,6 +352,15 @@ contract BlockSheep is Ownable {
             _races[index].numOfQuestions = race.numOfQuestions;
             _races[index].playersCount = race.playersCount;
             _races[index].registered = race.playerRegistered[user];
+
+            // Initialize an array to store gameIds
+            uint256[] memory games = new uint256[](race.numOfGames);
+            
+            // Populate the games array with gameIds
+            for (uint8 i = 0; i < race.numOfGames; i++) {
+                games[i] = race.games[i].gameId;
+            }
+            _races[index].games = games;
         }
         return _races;
     }
