@@ -105,6 +105,7 @@ contract BlockSheep is Ownable {
     error AlreadyDistributed();
     error AlreadyRegistered();
     error RaceIsFull();
+    error NotRegistered();
 
     event Registered(address user, uint256 amount);
 
@@ -125,6 +126,14 @@ contract BlockSheep is Ownable {
     function withdraw(uint256 amount) external {
         balances[msg.sender] -= amount;
         //UNDERLYING.safeTransfer(msg.sender, amount);
+    }
+
+    function refundBalance(uint256 amount, uint256 raceId) external {
+        Race storage race = races[raceId];
+        if (race.startAt > block.timestamp) revert InvalidTimestamp();
+        if (race.playerRegistered[msg.sender] == false) revert NotRegistered();
+
+        balances[msg.sender] += amount;
     }
 
     function register(uint256 raceId) external {
