@@ -81,7 +81,7 @@ contract BlockSheep is Ownable {
         uint8 playersCount;
         mapping(uint256 => Game) games;
         mapping(address => bool) playerRegistered;
-        mapping(address => uint256[]) racesCompleted;
+        mapping(address => uint256[]) gamesCompleted;
     }
 
     struct RaceInfo {
@@ -93,7 +93,7 @@ contract BlockSheep is Ownable {
         bool registered;
         RaceStatus status;
         uint256[] games;
-        uint256[] racesCompletedPerUser;
+        uint256[] gamesCompletedPerUser;
         uint256 raceDuration;
     }
 
@@ -172,12 +172,17 @@ contract BlockSheep is Ownable {
     function distributeReward(
         uint256 raceId,
         uint8 gameIndex,
-        uint8 qIndex
+        uint8[] calldata qIndexes
     ) external {
         validateRaceId(raceId);
         validateGameIndex(raceId, gameIndex);
-        Game storage game = races[raceId].games[gameIndex];
-        _distributeRewardOfQuestion(game, qIndex);
+        Race storage race = races[raceId];
+        Game storage game = race.games[gameIndex];
+        for (uint8 i = 0; i < qIndexes.length; i++) {
+            _distributeRewardOfQuestion(game, qIndexes[i]);
+        }
+
+        race.gamesCompleted[msg.sender].push(game.gameId);
     }
 
     function _distributeRewardOfQuestion(
@@ -317,7 +322,7 @@ contract BlockSheep is Ownable {
             uint8 numOfQuestions,
             uint8 playersCount,
             uint256[] memory games,
-            uint256[] memory racesCompletedPerUser,
+            uint256[] memory gamesCompletedPerUser,
             uint256 raceDuration
         )
     {
@@ -336,7 +341,7 @@ contract BlockSheep is Ownable {
             games[i] = race.games[i].gameId;
         }
 
-        racesCompletedPerUser = race.racesCompleted[msg.sender];
+        gamesCompletedPerUser = race.gamesCompleted[msg.sender];
 
         raceDuration = GAME_DURATION * race.numOfGames;
     }
@@ -380,7 +385,7 @@ contract BlockSheep is Ownable {
             }
             _races[index].games = games;
 
-            _races[index].racesCompletedPerUser = race.racesCompleted[msg.sender];
+            _races[index].gamesCompletedPerUser = race.gamesCompleted[msg.sender];
 
             _races[index].raceDuration = GAME_DURATION * race.numOfGames;
         }

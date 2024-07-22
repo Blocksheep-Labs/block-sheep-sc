@@ -69,7 +69,7 @@ contract BlockSheepTest is Test {
     }
 
     function registerInternal(address user, uint256 raceId) internal {
-        (, , , uint8 numberOfQuestions, , ) = blockSheep.getRaces(raceId);
+        (, , , uint8 numberOfQuestions, , , , ) = blockSheep.getRaces(raceId);
         uint256 amount = blockSheep.COST() * numberOfQuestions;
         vm.startPrank(user);
         usdc.approve(address(blockSheep), amount);

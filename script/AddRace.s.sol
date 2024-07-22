@@ -5,12 +5,12 @@ import {BlockSheep} from "../src/BlockSheep.sol";
 
 contract AddRace is Script {
     BlockSheep internal blockSheep =
-        BlockSheep(0x9089533a70608f94AC8e93F278D2ba04db8e9D68);
+        BlockSheep(0xD59380cA58fFa245867d565897Cb966005760735);
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
         
-        BlockSheep.GameParams[] memory games = new BlockSheep.GameParams[](2);
+        BlockSheep.GameParams[] memory games = new BlockSheep.GameParams[](1);
         games[0].gameId = 0;
         games[0].questionIds = new uint256[](3);
         games[0].questionIds[0] = 0;
