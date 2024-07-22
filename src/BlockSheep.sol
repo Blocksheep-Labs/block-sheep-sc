@@ -182,7 +182,11 @@ contract BlockSheep is Ownable {
             _distributeRewardOfQuestion(game, qIndexes[i]);
         }
 
-        race.gamesCompleted[msg.sender].push(game.gameId);
+        if (race.gamesCompleted[msg.sender].length == 0) {
+            race.gamesCompleted[msg.sender] = new uint256[](0);
+        }
+        
+        race.gamesCompleted[msg.sender].push(gameIndex);
     }
 
     function _distributeRewardOfQuestion(
@@ -311,7 +315,8 @@ contract BlockSheep is Ownable {
     }
 
     function getRaces(
-        uint256 id
+        uint256 id,
+        address user
     )
         public
         view
@@ -341,7 +346,8 @@ contract BlockSheep is Ownable {
             games[i] = race.games[i].gameId;
         }
 
-        gamesCompletedPerUser = race.gamesCompleted[msg.sender];
+        // populate gamesCompleted per race
+        gamesCompletedPerUser = race.gamesCompleted[user];
 
         raceDuration = GAME_DURATION * race.numOfGames;
     }
@@ -385,7 +391,7 @@ contract BlockSheep is Ownable {
             }
             _races[index].games = games;
 
-            _races[index].gamesCompletedPerUser = race.gamesCompleted[msg.sender];
+            _races[index].gamesCompletedPerUser = race.gamesCompleted[user];
 
             _races[index].raceDuration = GAME_DURATION * race.numOfGames;
         }

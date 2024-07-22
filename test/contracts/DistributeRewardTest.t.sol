@@ -2,7 +2,7 @@ pragma solidity ^0.8.20;
 
 import {BlockSheep} from "src/BlockSheep.sol";
 import {BlockSheepTest} from "test/contracts/BlockSheep.t.sol";
-import "forge-std/console.sol";
+
 
 contract DistributeRewardTest is BlockSheepTest {
     function setUp() public override {
@@ -22,7 +22,14 @@ contract DistributeRewardTest is BlockSheepTest {
     }
 
     function test_DistributeReward() public {
-        blockSheep.distributeReward(0, 0, 0);
+        uint8[1] memory fixedArray = [0];  // Fixed-size array with one element
+        uint8[] memory dynamicArray = new uint8[](fixedArray.length);
+
+        for (uint8 i = 0; i < fixedArray.length; i++) {
+            dynamicArray[i] = fixedArray[i];
+        }
+
+        blockSheep.distributeReward(0, 0, dynamicArray);
 
         uint256 winnerScore = blockSheep.getScoreAtGameOfUser(0, 0, playerTwo);
         assertEq(winnerScore, 2);
