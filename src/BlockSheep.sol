@@ -73,6 +73,14 @@ contract BlockSheep is Ownable {
         DISRIBUTTED
     }
 
+    struct RabbitTunnel {
+        address[] usersAddresses;
+        uint256[] fuelSubmissions;
+        uint256[] fuelLeft;
+        address[] finishedBy;
+        address winner;
+    }
+
     struct Race {
         string name;
         uint64 startAt;
@@ -84,6 +92,7 @@ contract BlockSheep is Ownable {
         mapping(address => uint256[]) gamesCompleted;
         mapping(address => bool) refunded;
         address[] registeredUsers;
+        RabbitTunnel rabbitTunnel;
     }
 
     struct RaceInfo {
@@ -99,6 +108,7 @@ contract BlockSheep is Ownable {
         uint256 raceDuration;
         bool refunded;
         address[] registeredUsers;
+        RabbitTunnel rabbitTunnel;
     }
 
 
@@ -173,6 +183,33 @@ contract BlockSheep is Ownable {
         question.answered[msg.sender] = true;
         question.answeredPlayersCount++;
         question.playersByAnswer[aId].push(msg.sender);
+    }
+
+    
+    function submitFuel(
+        uint256 raceId,
+        uint256 fuelSubmision,
+        uint256 fuelLeft
+    ) external {
+        validateRaceId(raceId);
+        RabbitTunnel storage rabbitTunnel = races[raceId].rabbitTunnel;
+
+        rabbitTunnel.usersAddresses.push(msg.sender);
+        rabbitTunnel.fuelSubmissions.push(fuelSubmision);
+        rabbitTunnel.fuelLeft.push(fuelLeft);
+    }
+
+    function finishTunnelGame(
+        uint256 raceId,
+        bool isWon
+    ) external {
+        validateRaceId(raceId);
+        RabbitTunnel storage rabbitTunnel = races[raceId].rabbitTunnel;
+
+        rabbitTunnel.finishedBy.push(msg.sender);
+        if (isWon) {
+            rabbitTunnel.winner = msg.sender;
+        }
     }
 
     function distributeReward(
@@ -336,7 +373,8 @@ contract BlockSheep is Ownable {
             uint256[] memory gamesCompletedPerUser,
             uint256 raceDuration,
             bool refunded,
-            address[] memory registeredUsers
+            address[] memory registeredUsers,
+            RabbitTunnel memory rabbitTunnel
         )
     {
         Race storage race = races[id];
@@ -362,6 +400,8 @@ contract BlockSheep is Ownable {
         refunded = race.refunded[user];
 
         registeredUsers = race.registeredUsers;
+
+        rabbitTunnel = race.rabbitTunnel;
     }
 
     function getScoreAtGameOfUser(
@@ -410,6 +450,8 @@ contract BlockSheep is Ownable {
             _races[index].refunded = race.refunded[user];
 
             _races[index].registeredUsers = race.registeredUsers;
+
+            _races[index].rabbitTunnel = race.rabbitTunnel;
         }
 
         return _races;
