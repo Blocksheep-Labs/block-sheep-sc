@@ -412,6 +412,22 @@ contract BlockSheep is Ownable {
         return races[raceId].games[gameIndex].scoreByAddress[user];
     }
 
+    function getScoreAtRaceOfUser(uint256 raceId, address user) external view returns (uint256) {
+        uint256 scores = 0;
+        Race storage race = races[raceId];
+        
+        for (uint256 gameId = 0; gameId < race.numOfGames; gameId++) {
+            Game storage game = race.games[gameId];
+            scores += game.scoreByAddress[user];
+        }
+        
+        if (race.rabbitTunnel.winner == user) {
+            scores += 1;
+        }
+
+        return scores;
+    }
+
     function getRacesWithPagination(
         address user,
         uint256 from,
