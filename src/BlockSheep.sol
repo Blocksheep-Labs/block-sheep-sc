@@ -86,13 +86,13 @@ contract BlockSheep is Ownable {
         uint64 startAt;
         uint8 numOfGames;
         uint8 numOfQuestions;
-        uint8 playersCount;
         mapping(uint256 => Game) games;
         mapping(address => bool) playerRegistered;
         mapping(address => uint256[]) gamesCompleted;
         mapping(address => bool) refunded;
         address[] registeredUsers;
         RabbitTunnel rabbitTunnel;
+        uint8 numOfPlayersRequired;
     }
 
     struct RaceInfo {
@@ -100,7 +100,6 @@ contract BlockSheep is Ownable {
         uint64 startAt;
         uint8 numOfGames;
         uint8 numOfQuestions;
-        uint8 playersCount;
         bool registered;
         RaceStatus status;
         uint256[] games;
@@ -109,6 +108,7 @@ contract BlockSheep is Ownable {
         bool refunded;
         address[] registeredUsers;
         RabbitTunnel rabbitTunnel;
+        uint8 numOfPlayersRequired;
     }
 
 
@@ -159,10 +159,9 @@ contract BlockSheep is Ownable {
         if (raceId >= nextRaceId) revert InvalidRaceId();
         if (block.timestamp > race.startAt) revert InvalidTimestamp();
         if (race.playerRegistered[msg.sender]) revert AlreadyRegistered();
-        if (race.playersCount >= NUM_OF_PLAYERS_PER_RACE) revert RaceIsFull();
+        if (race.registeredUsers.length >= race.numOfPlayersRequired) revert RaceIsFull();
         balances[msg.sender] -= race.numOfQuestions * COST;
         race.playerRegistered[msg.sender] = true;
-        race.playersCount++;
         race.registeredUsers.push(msg.sender);
 
         emit Registered(msg.sender, race.numOfQuestions * COST);
@@ -300,6 +299,7 @@ contract BlockSheep is Ownable {
     function addRace(
         string memory name,
         uint64 startAt,
+        uint8 numOfPlayersRequired,
         GameParams[] memory games
     ) external onlyOwner {
         if (startAt < block.timestamp + MIN_SECONDS_BEFORE_START_RACE)
@@ -307,6 +307,7 @@ contract BlockSheep is Ownable {
         if (games.length == 0) revert EmptyQuestions();
         Race storage _race = races[nextRaceId];
         _race.name = name;
+        _race.numOfPlayersRequired = numOfPlayersRequired;
         _race.startAt = startAt;
         _race.numOfGames = uint8(games.length);
         uint64 endAt = startAt;
@@ -368,13 +369,13 @@ contract BlockSheep is Ownable {
             uint64 startAt,
             uint8 numOfGames,
             uint8 numOfQuestions,
-            uint8 playersCount,
             uint256[] memory games,
             uint256[] memory gamesCompletedPerUser,
             uint256 raceDuration,
             bool refunded,
             address[] memory registeredUsers,
-            RabbitTunnel memory rabbitTunnel
+            RabbitTunnel memory rabbitTunnel,
+            uint8 numOfPlayersRequired
         )
     {
         Race storage race = races[id];
@@ -382,7 +383,6 @@ contract BlockSheep is Ownable {
         startAt = race.startAt;
         numOfGames = race.numOfGames;
         numOfQuestions = race.numOfQuestions;
-        playersCount = race.playersCount;
 
         // Initialize an array to store gameIds
         games = new uint256[](race.numOfGames);
@@ -402,6 +402,8 @@ contract BlockSheep is Ownable {
         registeredUsers = race.registeredUsers;
 
         rabbitTunnel = race.rabbitTunnel;
+
+        numOfPlayersRequired = race.numOfPlayersRequired;
     }
 
     function getScoreAtGameOfUser(
@@ -447,7 +449,6 @@ contract BlockSheep is Ownable {
             _races[index].startAt = race.startAt;
             _races[index].numOfGames = race.numOfGames;
             _races[index].numOfQuestions = race.numOfQuestions;
-            _races[index].playersCount = race.playersCount;
             _races[index].registered = race.playerRegistered[user];
 
             // Initialize an array to store gameIds
@@ -468,6 +469,8 @@ contract BlockSheep is Ownable {
             _races[index].registeredUsers = race.registeredUsers;
 
             _races[index].rabbitTunnel = race.rabbitTunnel;
+
+            _races[index].numOfPlayersRequired = race.numOfPlayersRequired;
         }
 
         return _races;
@@ -477,7 +480,7 @@ contract BlockSheep is Ownable {
         if (raceId > nextRaceId) return RaceStatus.NON_EXIST;
         Race storage race = races[raceId];
         if (race.startAt < block.timestamp) return RaceStatus.CREATED;
-        if (race.playersCount < NUM_OF_PLAYERS_PER_RACE)
+        if (race.registeredUsers.length < NUM_OF_PLAYERS_PER_RACE)
             return RaceStatus.CANCELLED;
 
         return RaceStatus.STARTED;

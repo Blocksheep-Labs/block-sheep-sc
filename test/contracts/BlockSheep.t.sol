@@ -65,7 +65,7 @@ contract BlockSheepTest is Test {
         games[0].questionIds[0] = 0;
         games[0].questionIds[1] = 1;
         games[0].questionIds[2] = 2;
-        blockSheep.addRace("Race 1", uint64(block.timestamp + 2 hours), games);
+        blockSheep.addRace("Race 1", uint64(block.timestamp + 2 hours), 3, games);
     }
 
     function registerInternal(address user, uint256 raceId) internal {
