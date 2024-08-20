@@ -136,13 +136,19 @@ contract BlockSheep is Ownable {
     }
 
     function deposit(uint256 amount) external {
+        if (amount == 0) revert("Amount must be greater than zero");
+        
+        UNDERLYING.safeTransferFrom(msg.sender, address(this), amount);
         balances[msg.sender] += amount;
-        //UNDERLYING.safeTransferFrom(msg.sender, address(this), amount);
     }
 
     function withdraw(uint256 amount) external {
+        if (amount == 0) revert("Amount must be greater than zero");
+        if (balances[msg.sender] < amount) revert("Insufficient balance");
+        if (UNDERLYING.balanceOf(address(this)) < amount) revert("Contract balance too low");
+
+        UNDERLYING.safeTransfer(msg.sender, amount);
         balances[msg.sender] -= amount;
-        //UNDERLYING.safeTransfer(msg.sender, amount);
     }
 
     function refundBalance(uint256 amount, uint256 raceId) external {
