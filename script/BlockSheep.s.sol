@@ -10,6 +10,7 @@ contract DeployBlockSheep is Script {
         new BlockSheep(
             0x5D2c14A4180A2268cd24460BEca96713ff3Ab2a2,
             vm.addr(deployerPrivateKey),
+            10e6,
             10e6
         );
         vm.stopBroadcast();

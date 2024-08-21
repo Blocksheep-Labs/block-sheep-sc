@@ -2,18 +2,18 @@
 pragma solidity ^0.8.20;
 
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
-import { IERC20 } from "@openzeppelin/contracts/interfaces/IERC20.sol";
-import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
+import { MockUSDC } from "./MockUSDC.sol";
 
 contract BlockSheep is Ownable {
-    using SafeERC20 for IERC20;
+    //using SafeERC20 for IERC20;
 
     uint8 private constant NUM_OF_PLAYERS_PER_RACE = 3;
     uint64 private constant MIN_SECONDS_BEFORE_START_RACE = 5 minutes;
     uint64 private constant GAME_DURATION = 5 * 60;
 
-    IERC20 public immutable UNDERLYING;
-    uint256 public immutable COST;
+    MockUSDC public immutable UNDERLYING;
+    uint256  public immutable COST;
+    uint256  public tokenPrice;
 
     mapping(address => uint256) public balances;
     uint256 public feeCollected;
@@ -129,26 +129,33 @@ contract BlockSheep is Ownable {
     constructor(
         address _underlying,
         address owner,
-        uint256 _cost
+        uint256 _cost,
+        uint256 initialTokenPrice
     ) Ownable(owner) {
-        UNDERLYING = IERC20(_underlying);
+        UNDERLYING = MockUSDC(_underlying);
         COST = _cost;
+        tokenPrice = initialTokenPrice;
     }
 
-    function deposit(uint256 amount) external {
-        if (amount == 0) revert("Amount must be greater than zero");
-        
-        UNDERLYING.safeTransferFrom(msg.sender, address(this), amount);
-        balances[msg.sender] += amount;
+    function deposit() external payable {
+        uint256 amountToBuy = msg.value / tokenPrice;
+        if (amountToBuy <= 0) revert("Amount to buy must be greater than zero");
+
+        UNDERLYING.mint(msg.sender, amountToBuy);
+        balances[msg.sender] += amountToBuy;
     }
 
     function withdraw(uint256 amount) external {
         if (amount == 0) revert("Amount must be greater than zero");
         if (balances[msg.sender] < amount) revert("Insufficient balance");
-        if (UNDERLYING.balanceOf(address(this)) < amount) revert("Contract balance too low");
-
-        UNDERLYING.safeTransfer(msg.sender, amount);
+        
+        payable(msg.sender).transfer(amount * tokenPrice);
         balances[msg.sender] -= amount;
+        UNDERLYING.burn(msg.sender, amount);
+    }
+
+    function setTokenPrice(uint256 newPrice) public onlyOwner {
+        tokenPrice = newPrice;
     }
 
     function refundBalance(uint256 amount, uint256 raceId) external {
@@ -157,6 +164,7 @@ contract BlockSheep is Ownable {
         if (race.playerRegistered[msg.sender] == false) revert NotRegistered();
 
         balances[msg.sender] += amount;
+        UNDERLYING.mint(msg.sender, amount);
         race.refunded[msg.sender] = true;
     }
 
@@ -166,6 +174,8 @@ contract BlockSheep is Ownable {
         if (block.timestamp > race.startAt) revert InvalidTimestamp();
         if (race.playerRegistered[msg.sender]) revert AlreadyRegistered();
         if (race.registeredUsers.length >= race.numOfPlayersRequired) revert RaceIsFull();
+        
+        UNDERLYING.burn(msg.sender, race.numOfQuestions * COST);
         balances[msg.sender] -= race.numOfQuestions * COST;
         race.playerRegistered[msg.sender] = true;
         race.registeredUsers.push(msg.sender);

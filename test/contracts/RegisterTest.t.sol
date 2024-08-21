@@ -25,10 +25,10 @@ contract RegisterTest is BlockSheepTest {
         registerInternal(playerThree, 0);
         // vm.expectRevert(BlockSheep.RaceIsFull.selector);
         // vm.expectRevert();
-        uint256 amount = 30e6;
+        uint256 tokenPrice = blockSheep.tokenPrice();
+        uint256 amount = 30e6 * tokenPrice;
         vm.startPrank(playerFour);
-        usdc.approve(address(blockSheep), amount);
-        blockSheep.deposit(amount);
+        
         vm.expectRevert(BlockSheep.RaceIsFull.selector);
         blockSheep.register(0);
         vm.stopPrank();

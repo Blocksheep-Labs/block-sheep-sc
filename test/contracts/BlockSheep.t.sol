@@ -3,7 +3,7 @@ pragma solidity ^0.8.20;
 import "forge-std/Test.sol";
 
 import {BlockSheep} from "src/BlockSheep.sol";
-import {MockUSDC} from "src/test/MockUSDC.sol";
+import {MockUSDC} from "src/MockUSDC.sol";
 
 contract BlockSheepTest is Test {
     BlockSheep internal blockSheep;
@@ -19,7 +19,7 @@ contract BlockSheepTest is Test {
 
     function setUp() public virtual {
         usdc = new MockUSDC();
-        blockSheep = new BlockSheep(address(usdc), owner, cost);
+        blockSheep = new BlockSheep(address(usdc), owner, cost, cost);
         usdc.mint(playerOne, mintAmount);
         usdc.mint(playerTwo, mintAmount);
         usdc.mint(playerThree, mintAmount);
@@ -70,10 +70,12 @@ contract BlockSheepTest is Test {
 
     function registerInternal(address user, uint256 raceId) internal {
         (, , , uint8 numberOfQuestions, , , , , , , ) = blockSheep.getRaces(raceId, user);
-        uint256 amount = blockSheep.COST() * numberOfQuestions;
+        uint256 tokenPrice = blockSheep.tokenPrice();
+        uint256 amount = blockSheep.COST() * numberOfQuestions * tokenPrice;
         vm.startPrank(user);
-        usdc.approve(address(blockSheep), amount);
-        blockSheep.deposit(amount);
+        vm.deal(user, amount); // Give playerOne enough Ether for the deposit
+
+        blockSheep.deposit{value: amount}();
         blockSheep.register(raceId);
         vm.stopPrank();
     }

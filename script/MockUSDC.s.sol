@@ -1,7 +1,7 @@
 pragma solidity ^0.8.20;
 
 import "../lib/forge-std/src/Script.sol";
-import {MockUSDC} from "src/test/MockUSDC.sol";
+import {MockUSDC} from "src/MockUSDC.sol";
 
 contract DeployMockUSDC is Script {
     function run() external {
