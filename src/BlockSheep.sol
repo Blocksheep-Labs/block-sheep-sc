@@ -138,18 +138,17 @@ contract BlockSheep is Ownable {
     }
 
     function deposit() external payable {
-        uint256 amountToBuy = msg.value / tokenPrice;
-        if (amountToBuy <= 0) revert("Amount to buy must be greater than zero");
+        if (msg.value <= 0) revert("Amount to buy must be greater than zero");
 
-        UNDERLYING.mint(msg.sender, amountToBuy);
-        balances[msg.sender] += amountToBuy;
+        UNDERLYING.mint(msg.sender, msg.value);
+        balances[msg.sender] += msg.value;
     }
 
     function withdraw(uint256 amount) external {
         if (amount == 0) revert("Amount must be greater than zero");
         if (balances[msg.sender] < amount) revert("Insufficient balance");
         
-        payable(msg.sender).transfer(amount * tokenPrice);
+        payable(msg.sender).transfer(amount);
         balances[msg.sender] -= amount;
         UNDERLYING.burn(msg.sender, amount);
     }
