@@ -19,7 +19,7 @@ contract BlockSheepTest is Test {
 
     function setUp() public virtual {
         usdc = new MockUSDC();
-        blockSheep = new BlockSheep(address(usdc), owner, cost, cost);
+        blockSheep = new BlockSheep(address(usdc), owner, cost);
         usdc.mint(playerOne, mintAmount);
         usdc.mint(playerTwo, mintAmount);
         usdc.mint(playerThree, mintAmount);
@@ -70,12 +70,10 @@ contract BlockSheepTest is Test {
 
     function registerInternal(address user, uint256 raceId) internal {
         (, , , uint8 numberOfQuestions, , , , , , , ) = blockSheep.getRaces(raceId, user);
-        uint256 tokenPrice = blockSheep.tokenPrice();
-        uint256 amount = blockSheep.COST() * numberOfQuestions * tokenPrice;
+        uint256 amount = blockSheep.COST() * numberOfQuestions;
         vm.startPrank(user);
-        vm.deal(user, amount); // Give playerOne enough Ether for the deposit
-
-        blockSheep.deposit{value: amount}();
+        usdc.approve(address(blockSheep), amount);
+        blockSheep.deposit(amount);
         blockSheep.register(raceId);
         vm.stopPrank();
     }

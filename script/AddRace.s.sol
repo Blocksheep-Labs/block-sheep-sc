@@ -5,7 +5,7 @@ import {BlockSheep} from "../src/BlockSheep.sol";
 
 contract AddRace is Script {
     BlockSheep internal blockSheep =
-        BlockSheep(0x95C081A300616F1503f0b9083314d84A97673e5e);
+        BlockSheep(0x4124c0AE17d74034634817e6550412Df5E3B8f80);
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
