@@ -137,6 +137,7 @@ contract BlockSheep is Ownable {
     ) Ownable(owner) {
         UNDERLYING = IERC20(_underlying);
         COST = _cost;
+        userHasAdminAccess[owner] = true;
     }
 
     function deposit(uint256 amount) external {
