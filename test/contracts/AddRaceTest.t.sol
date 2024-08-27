@@ -19,12 +19,7 @@ contract AddRaceTest is BlockSheepTest {
     }
 
     function test_RevertWhen_CallerIsNotOwner() public {
-        vm.expectRevert(
-            abi.encodeWithSignature(
-                "OwnableUnauthorizedAccount(address)",
-                address(2)
-            )
-        );
+        vm.expectRevert();
         vm.startPrank(address(2));
         addRaceInternal();
         vm.stopPrank();

@@ -31,6 +31,9 @@ contract BlockSheep is Ownable {
 
     uint256 public nextRaceId;
 
+    // list of admin access
+    mapping(address => bool) public userHasAdminAccess;
+
     struct QuestionInfo {
         string content;
         string[] answers;
@@ -123,6 +126,7 @@ contract BlockSheep is Ownable {
     error AlreadyRegistered();
     error RaceIsFull();
     error NotRegistered();
+    error AccessDenied();
 
     event Registered(address user, uint256 amount);
 
@@ -173,6 +177,10 @@ contract BlockSheep is Ownable {
         emit Registered(msg.sender, race.numOfQuestions * COST);
     }
 
+    function setAdminRights(address user, bool isAdmin) external onlyOwner {
+        userHasAdminAccess[user] = isAdmin;
+    }
+
     function submitAnswer(
         uint256 raceId,
         uint8 gameIndex,
@@ -220,14 +228,18 @@ contract BlockSheep is Ownable {
     function distributeReward(
         uint256 raceId,
         uint8 gameIndex,
-        uint8[] calldata qIndexes
+        uint8[] calldata qIndexes,
+        bool isDraw
     ) external {
         validateRaceId(raceId);
         validateGameIndex(raceId, gameIndex);
         Race storage race = races[raceId];
-        Game storage game = race.games[gameIndex];
-        for (uint8 i = 0; i < qIndexes.length; i++) {
-            _distributeRewardOfQuestion(game, qIndexes[i]);
+
+        if (isDraw == false) {
+            Game storage game = race.games[gameIndex];
+            for (uint8 i = 0; i < qIndexes.length; i++) {
+                _distributeRewardOfQuestion(game, qIndexes[i]);
+            }
         }
 
         if (race.gamesCompleted[msg.sender].length == 0) {
@@ -304,10 +316,14 @@ contract BlockSheep is Ownable {
 
     function addRace(
         string memory name,
-        uint64 startAt,
+        uint64 hoursBeforeFinish,
         uint8 numOfPlayersRequired,
         GameParams[] memory games
-    ) external onlyOwner {
+    ) external {
+        if (userHasAdminAccess[msg.sender] == false && msg.sender != owner()) {
+            revert AccessDenied();
+        }
+        uint64 startAt = uint64(block.timestamp + (hoursBeforeFinish * 3600));
         if (startAt < block.timestamp + MIN_SECONDS_BEFORE_START_RACE)
             revert InvalidTimestamp();
         if (games.length == 0) revert EmptyQuestions();

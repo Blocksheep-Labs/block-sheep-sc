@@ -18,7 +18,7 @@ contract AddRace is Script {
         games[0].questionIds[1] = 1;
         games[0].questionIds[2] = 2;
 
-        blockSheep.addRace("Third", uint64(block.timestamp + 1 hours), 3, games);
+        blockSheep.addRace("Third", 1, 3, games);
         vm.stopBroadcast();
     }
 }
