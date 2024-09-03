@@ -262,9 +262,8 @@ contract BlockSheep is Ownable {
             j++
         ) {
             address winner = question.playersByAnswer[minAnswerId][j];
-            game.scoreByAddress[winner] +=
-                2 *
-                question.playersByAnswer[minAnswerId].length;
+            game.scoreByAddress[winner] += 2;
+                // * question.playersByAnswer[minAnswerId].length;
         }
     }
 
