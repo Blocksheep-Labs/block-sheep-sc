@@ -82,6 +82,9 @@ contract BlockSheep is Ownable {
         uint256[] fuelLeft;
         address[] finishedBy;
         address winner;
+        
+        address[] pointsAddresses;
+        uint256[] pointsAmount;
     }
 
     struct Race {
@@ -215,10 +218,13 @@ contract BlockSheep is Ownable {
 
     function finishTunnelGame(
         uint256 raceId,
-        bool isWon
+        bool isWon,
+        uint256 pointsToAllocate
     ) external {
         validateRaceId(raceId);
         RabbitTunnel storage rabbitTunnel = races[raceId].rabbitTunnel;
+        rabbitTunnel.pointsAddresses.push(msg.sender);
+        rabbitTunnel.pointsAmount.push(pointsToAllocate);
 
         rabbitTunnel.finishedBy.push(msg.sender);
         if (isWon) {
@@ -239,7 +245,7 @@ contract BlockSheep is Ownable {
         if (isDraw == false) {
             Game storage game = race.games[gameIndex];
             for (uint8 i = 0; i < qIndexes.length; i++) {
-                _distributeRewardOfQuestion(game, qIndexes[i]);
+                _distributeRewardOfQuestion(game, qIndexes[i], msg.sender);
             }
         }
 
@@ -252,7 +258,8 @@ contract BlockSheep is Ownable {
 
     function _distributeRewardOfQuestion(
         Game storage game,
-        uint8 questionIndex
+        uint8 questionIndex,
+        address actualSender
     ) internal {
         Question storage question = game.questions[questionIndex];
         uint8 minAnswerId = _getWinningAnswerIdOfQuestion(question);
@@ -262,8 +269,10 @@ contract BlockSheep is Ownable {
             j++
         ) {
             address winner = question.playersByAnswer[minAnswerId][j];
-            game.scoreByAddress[winner] += 2;
+            //if (winner == actualSender) {
+                game.scoreByAddress[winner] += 2;
                 // * question.playersByAnswer[minAnswerId].length;
+            //}
         }
     }
 
@@ -431,9 +440,24 @@ contract BlockSheep is Ownable {
     function getScoreAtGameOfUser(
         uint256 raceId,
         uint256 gameIndex,
-        address user
+        address user,
+        string memory gameName
     ) external view returns (uint256) {
-        return races[raceId].games[gameIndex].scoreByAddress[user];
+        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("underdog"))) {
+            return races[raceId].games[gameIndex].scoreByAddress[user];
+        } 
+
+        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("rabbit-hole"))) {
+            uint256 points = 0;
+            for (uint256 i = 0; i < races[raceId].rabbitTunnel.pointsAddresses.length; i++) {
+                if (races[raceId].rabbitTunnel.pointsAddresses[i] == user) {
+                    points = races[raceId].rabbitTunnel.pointsAmount[i];
+                }
+            }
+            return points;
+        }
+
+        return 0;
     }
 
     function getScoreAtRaceOfUser(uint256 raceId, address user) external view returns (uint256) {
@@ -444,10 +468,15 @@ contract BlockSheep is Ownable {
             Game storage game = race.games[gameId];
             scores += game.scoreByAddress[user];
         }
-        
-        if (race.rabbitTunnel.winner == user) {
-            scores += 1;
+
+        uint256 pointsRabbitTunnel = 0;
+        for (uint256 i = 0; i < races[raceId].rabbitTunnel.pointsAddresses.length; i++) {
+            if (races[raceId].rabbitTunnel.pointsAddresses[i] == user) {
+                pointsRabbitTunnel = races[raceId].rabbitTunnel.pointsAmount[i];
+            }
         }
+
+        scores += pointsRabbitTunnel;
 
         return scores;
     }
