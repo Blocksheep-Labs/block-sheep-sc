@@ -236,7 +236,8 @@ contract BlockSheep is Ownable {
         uint256 raceId,
         uint8 gameIndex,
         uint8[] calldata qIndexes,
-        bool isDraw
+        bool isDraw,
+        address distributer
     ) external {
         validateRaceId(raceId);
         validateGameIndex(raceId, gameIndex);
@@ -245,15 +246,15 @@ contract BlockSheep is Ownable {
         if (isDraw == false) {
             Game storage game = race.games[gameIndex];
             for (uint8 i = 0; i < qIndexes.length; i++) {
-                _distributeRewardOfQuestion(game, qIndexes[i], msg.sender);
+                _distributeRewardOfQuestion(game, qIndexes[i], distributer);
             }
         }
 
-        if (race.gamesCompleted[msg.sender].length == 0) {
-            race.gamesCompleted[msg.sender] = new uint256[](0);
+        if (race.gamesCompleted[distributer].length == 0) {
+            race.gamesCompleted[distributer] = new uint256[](0);
         }
         
-        race.gamesCompleted[msg.sender].push(gameIndex);
+        race.gamesCompleted[distributer].push(gameIndex);
     }
 
     function _distributeRewardOfQuestion(
@@ -269,10 +270,10 @@ contract BlockSheep is Ownable {
             j++
         ) {
             address winner = question.playersByAnswer[minAnswerId][j];
-            //if (winner == actualSender) {
-                game.scoreByAddress[winner] += 2;
+            if (winner == actualSender) {
+                game.scoreByAddress[winner] += 1;
                 // * question.playersByAnswer[minAnswerId].length;
-            //}
+            }
         }
     }
 

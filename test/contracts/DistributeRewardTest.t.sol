@@ -29,7 +29,7 @@ contract DistributeRewardTest is BlockSheepTest {
             dynamicArray[i] = fixedArray[i];
         }
 
-        blockSheep.distributeReward(0, 0, dynamicArray, false);
+        blockSheep.distributeReward(0, 0, dynamicArray, false, playerTwo);
 
         uint256 winnerScore = blockSheep.getScoreAtGameOfUser(0, 0, playerTwo, "underdog");
         assertEq(winnerScore, 2);
