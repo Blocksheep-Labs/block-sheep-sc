@@ -277,19 +277,34 @@ contract BlockSheep is Ownable {
         }
     }
 
+    /*
     function _getWinningAnswerIdOfQuestion(
         Question storage question
     ) internal view returns (uint8 minAnswerId) {
         if (question.distributed) revert AlreadyDistributed();
         minAnswerId = type(uint8).max;
-        for (
-            uint8 i = 0;
-            i < questions[question.questionId].answers.length;
-            i++
-        ) {
+        for (uint8 i = 0; i < questions[question.questionId].answers.length; i++) {
             uint256 count = question.playersByAnswer[i].length;
 
             if (count < minAnswerId) minAnswerId = i;
+        }
+    }
+    */
+
+    function _getWinningAnswerIdOfQuestion(
+        Question storage question
+    ) internal view returns (uint8 winningAnswerId) {
+        if (question.distributed) revert AlreadyDistributed();
+        uint256 minCount = type(uint256).max;
+        winningAnswerId = 0;
+
+        for (uint8 i = 0; i < questions[question.questionId].answers.length; i++) {
+            uint256 count = question.playersByAnswer[i].length;
+
+            if (count < minCount) {
+                minCount = count;
+                winningAnswerId = i;
+            }
         }
     }
 

@@ -5,7 +5,7 @@ import {BlockSheep} from "../src/BlockSheep.sol";
 
 contract AddGameAndQuestions is Script {
     BlockSheep internal blockSheep =
-        BlockSheep(0x0D300B91087bA79BE970284B460B06D9222563D3);
+        BlockSheep(0xC8277F250ea788434316c633168454f3d2376904);
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
