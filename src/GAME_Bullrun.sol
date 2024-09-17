@@ -7,7 +7,8 @@ contract GAME_Bullrun {
 
     // user chioces by gameId as an array of string
     //      raceId            user-addr    choices
-    mapping(uint256 => mapping(address => string[])) public usersChoices;
+    mapping(uint256 => mapping(address => string[]))  public usersChoicesTitles;
+    mapping(uint256 => mapping(address => uint256[])) public usersChoicesPoints;
 
     // points per perks per gameId
     //       raceId           perk-name   points
@@ -28,19 +29,19 @@ contract GAME_Bullrun {
     function getAmountOfPointsPerGame(address user, uint256 raceId) public view returns(uint256 points) {
         points = 0;
         // iterate over the answers
-        for (uint256 i = 0; i < usersChoices[raceId][user].length; i++) {
+        for (uint256 i = 0; i < usersChoicesPoints[raceId][user].length; i++) {
             // incr or decr the points based on answer
-            string storage choice = usersChoices[raceId][user][i];
-            points += pointsPerPerks[raceId][choice];
+            points += usersChoicesPoints[raceId][user][i];
         }
     }
 
-    function makeChoice(uint256 raceId, string calldata choice) public {
+    function makeChoice(uint256 raceId, string calldata choice, uint256 points) public {
         // add user to participants on the 1st choice
-        if (usersChoices[raceId][msg.sender].length == 0) {
+        if (usersChoicesTitles[raceId][msg.sender].length == 0) {
             gameParticipants[raceId].push(msg.sender);
         }
-        usersChoices[raceId][msg.sender].push(choice);
+        usersChoicesTitles[raceId][msg.sender].push(choice);
+        usersChoicesPoints[raceId][msg.sender].push(points);
     }
 
     function setPointsPerPerksForRace(

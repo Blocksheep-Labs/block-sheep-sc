@@ -559,9 +559,9 @@ contract BlockSheep is Ownable {
         BULLRUN.setPointsPerPerksForRace(raceId, perks, points);
     }
 
-    function BULLRUN_makeChoice(uint256 raceId, string calldata choice) public {
+    function BULLRUN_makeChoice(uint256 raceId, string calldata choice, uint256 points) public {
         validateRaceId(raceId);
-        BULLRUN.makeChoice(raceId, choice);
+        BULLRUN.makeChoice(raceId, choice, points);
     }
 
     function BULLRUN_getAmountOfPointsPerGame(address user, uint256 raceId) public view returns(uint256 points) {
