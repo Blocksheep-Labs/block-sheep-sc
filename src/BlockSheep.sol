@@ -4,9 +4,12 @@ pragma solidity ^0.8.20;
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { GAME_Bullrun } from "./GAME_Bullrun.sol";
 
 contract BlockSheep is Ownable {
     using SafeERC20 for IERC20;
+
+    GAME_Bullrun BULLRUN;
 
     uint8 private constant NUM_OF_PLAYERS_PER_RACE = 3;
     uint64 private constant MIN_SECONDS_BEFORE_START_RACE = 5 minutes;
@@ -99,6 +102,7 @@ contract BlockSheep is Ownable {
         address[] registeredUsers;
         RabbitTunnel rabbitTunnel;
         uint8 numOfPlayersRequired;
+        GAME_Bullrun BULLRUN;
     }
 
     struct RaceInfo {
@@ -141,6 +145,7 @@ contract BlockSheep is Ownable {
         UNDERLYING = IERC20(_underlying);
         COST = _cost;
         userHasAdminAccess[owner] = true;
+        BULLRUN = new GAME_Bullrun(address(this));
     }
 
     function deposit(uint256 amount) external {
@@ -276,20 +281,6 @@ contract BlockSheep is Ownable {
             }
         }
     }
-
-    /*
-    function _getWinningAnswerIdOfQuestion(
-        Question storage question
-    ) internal view returns (uint8 minAnswerId) {
-        if (question.distributed) revert AlreadyDistributed();
-        minAnswerId = type(uint8).max;
-        for (uint8 i = 0; i < questions[question.questionId].answers.length; i++) {
-            uint256 count = question.playersByAnswer[i].length;
-
-            if (count < minAnswerId) minAnswerId = i;
-        }
-    }
-    */
 
     function _getWinningAnswerIdOfQuestion(
         Question storage question
@@ -473,6 +464,14 @@ contract BlockSheep is Ownable {
             return points;
         }
 
+        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("bullrun"))) {
+            (address user1, address user2, address user3) = BULLRUN.getWinnersPerGame(raceId);
+
+            if (user1 == msg.sender) return 3;
+            if (user2 == msg.sender) return 2;
+            if (user3 == msg.sender) return 1;
+        }
+
         return 0;
     }
 
@@ -551,5 +550,22 @@ contract BlockSheep is Ownable {
             return RaceStatus.CANCELLED;
 
         return RaceStatus.STARTED;
+    }
+
+
+    // BULLRUN FUNCTIONS
+    function BULLRUN_setPointsPerPerksForRace(uint256 raceId, string[] calldata perks, uint256[] calldata points) public onlyOwner {
+        validateRaceId(raceId);
+        BULLRUN.setPointsPerPerksForRace(raceId, perks, points);
+    }
+
+    function BULLRUN_makeChoice(uint256 raceId, string calldata choice) public {
+        validateRaceId(raceId);
+        BULLRUN.makeChoice(raceId, choice);
+    }
+
+    function BULLRUN_getAmountOfPointsPerGame(address user, uint256 raceId) public view returns(uint256 points) {
+        validateRaceId(raceId);
+        return BULLRUN.getAmountOfPointsPerGame(user, raceId);
     }
 }
