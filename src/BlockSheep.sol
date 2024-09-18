@@ -334,7 +334,8 @@ contract BlockSheep is Ownable {
         string memory name,
         uint64 hoursBeforeFinish,
         uint8 numOfPlayersRequired,
-        GameParams[] memory games
+        GameParams[] memory games,
+        int256[3][3] calldata points
     ) external {
         if (userHasAdminAccess[msg.sender] == false && msg.sender != owner()) {
             revert AccessDenied();
@@ -365,6 +366,8 @@ contract BlockSheep is Ownable {
         }
 
         _race.numOfQuestions = _numOfQuestions;
+
+        BULLRUN.setPointsPerPerksForRace(nextRaceId, points);
 
         nextRaceId++;
     }
@@ -554,9 +557,9 @@ contract BlockSheep is Ownable {
 
 
     // BULLRUN FUNCTIONS
-    function BULLRUN_setPointsPerPerksForRace(uint256 raceId, string[] calldata perks, uint256[] calldata points) public onlyOwner {
+    function BULLRUN_setPointsPerPerksForRace(uint256 raceId, int256[3][3] calldata points) public onlyOwner {
         validateRaceId(raceId);
-        BULLRUN.setPointsPerPerksForRace(raceId, perks, points);
+        BULLRUN.setPointsPerPerksForRace(raceId, points);
     }
 
     function BULLRUN_makeChoice(uint256 raceId, string calldata choice, uint256 points) public {
@@ -567,5 +570,15 @@ contract BlockSheep is Ownable {
     function BULLRUN_getAmountOfPointsPerGame(address user, uint256 raceId) public view returns(uint256 points) {
         validateRaceId(raceId);
         return BULLRUN.getAmountOfPointsPerGame(user, raceId);
+    }
+
+    function BULLRUN_getWinnersPerGame(uint256 raceId) public view returns (address, address, address) {
+        validateRaceId(raceId);
+        return BULLRUN.getWinnersPerGame(raceId);
+    }
+
+    function BULLRUN_getPerksMatrix(uint256 raceId) public view returns (int256[3][3] memory perksMatrix) {
+        validateRaceId(raceId);
+        return BULLRUN.getPerksMatrix(raceId);
     }
 }

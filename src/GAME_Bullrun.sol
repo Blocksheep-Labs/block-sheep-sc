@@ -12,7 +12,7 @@ contract GAME_Bullrun {
 
     // points per perks per gameId
     //       raceId           perk-name   points
-    mapping(uint256 => mapping(string => uint256)) public pointsPerPerks;
+    mapping(uint256 => mapping(uint256 => int256[])) public pointsPerPerks;
 
 
     // Track users who have participated in each game
@@ -46,12 +46,15 @@ contract GAME_Bullrun {
 
     function setPointsPerPerksForRace(
         uint256 raceId, 
-        string[] calldata perks, 
-        uint256[] calldata points
+        int256[3][3] calldata points
     ) public {
-        require(perks.length == points.length, "Perks and Points lengths are not equal");
-        for (uint256 i = 0; i < perks.length; i++) {
-            pointsPerPerks[raceId][perks[i]] = points[i];
+        require(points.length > 0, "Points matrix cannot be empty");
+        for (uint256 i = 0; i < points.length; i++) {
+            pointsPerPerks[raceId][i] = new int256[](points[i].length);
+
+            for (uint256 j = 0; j < points[i].length; j++) {
+                pointsPerPerks[raceId][i][j] = points[i][j];
+            }
         }
     }
 
@@ -96,5 +99,15 @@ contract GAME_Bullrun {
 
         return (highestUser, secondHighestUser, thirdHighestUser);
     }
+
+
+    function getPerksMatrix(uint256 raceId) public view returns (int256[3][3] memory perksMatrix) {
+        for (uint256 i = 0; i < 3; i++) {
+            for (uint256 j = 0; j < 3; j++) {
+                perksMatrix[i][j] = pointsPerPerks[raceId][i][j];
+            }
+        }
+    }
+
 
 } 
