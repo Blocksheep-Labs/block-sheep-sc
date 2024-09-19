@@ -132,6 +132,7 @@ contract BlockSheep is Ownable, GAME_Bullrun {
     error RaceIsFull();
     error NotRegistered();
     error AccessDenied();
+    error GameIsNotComplted();
 
     event Registered(address user, uint256 amount);
 
@@ -139,7 +140,7 @@ contract BlockSheep is Ownable, GAME_Bullrun {
         address _underlying,
         address owner,
         uint256 _cost
-    ) Ownable(owner) {
+    ) Ownable(owner) GAME_Bullrun(address(this)) {
         UNDERLYING = IERC20(_underlying);
         COST = _cost;
         userHasAdminAccess[owner] = true;
@@ -296,12 +297,23 @@ contract BlockSheep is Ownable, GAME_Bullrun {
         }
     }
 
-    function validateRaceId(uint256 raceId) internal view {
+    function validateRaceId(uint256 raceId) public view {
         if (raceId >= nextRaceId) revert InvalidRaceId();
     }
 
     function validateGameIndex(uint256 raceId, uint8 gameIndex) internal view {
         if (gameIndex >= races[raceId].numOfGames) revert InvalidGameIndex();
+    }
+
+    function validateGameCompletion(uint256 raceId, string calldata gameName) public view {
+        validateRaceId(raceId);
+        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("underdog"))) {
+            // TODO: check for underdog game completion somehow (after the refactoring of the underdog game)
+        }
+        // check the rabbit-hole game to be completed
+        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("rabbit-hole"))) {
+            if (races[raceId].rabbitTunnel.winner == address(0)) revert GameIsNotComplted();
+        }
     }
 
     /// Admin functions
