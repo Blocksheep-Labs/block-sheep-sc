@@ -1,82 +1,75 @@
-// SPDX-License-Identifier: SEE LICENSE IN LICENSE
-pragma solidity ^0.8.20;
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.0;
 
 contract GAME_Bullrun {
-    // main contract address
-    address public BLOCKSHEEP_ADDR;
+    // Struct to hold user choices and points
+    struct BULLRUN_UserChoices {
+        uint256[] selectedPerks;
+        int256 points;
+    }
 
-    // user chioces by gameId as an array of string
-    //      raceId            user-addr    choices
-    mapping(uint256 => mapping(address => string[]))  public usersChoicesTitles;
-    mapping(uint256 => mapping(address => uint256[])) public usersChoicesPoints;
+    // user choices and points by raceId and user address
+    //      raceId         user-addr    UserChoices
+    mapping(uint256 => mapping(address => BULLRUN_UserChoices)) private BULLRUN_usersChoices;
 
     // points per perks per gameId
     //       raceId           perk-name   points
-    mapping(uint256 => mapping(uint256 => int256[])) public pointsPerPerks;
-
+    mapping(uint256 => mapping(uint256 => int256[])) public BULLRUN_pointsPerPerks;
 
     // Track users who have participated in each game
     //      raceId      user-addrs
-    mapping(uint256 => address[]) public gameParticipants;
+    mapping(uint256 => address[]) public BULLRUN_gameParticipants;
 
+    constructor() {}
 
-    constructor(
-        address blocksheep
-    ) {
-        BLOCKSHEEP_ADDR = blocksheep;
+    function BULLRUN_getAmountOfPointsPerGame(address user, uint256 raceId) public view returns (int256) {
+        return BULLRUN_usersChoices[raceId][user].points;
     }
 
-    function getAmountOfPointsPerGame(address user, uint256 raceId) public view returns(uint256 points) {
-        points = 0;
-        // iterate over the answers
-        for (uint256 i = 0; i < usersChoicesPoints[raceId][user].length; i++) {
-            // incr or decr the points based on answer
-            points += usersChoicesPoints[raceId][user][i];
-        }
-    }
-
-    function makeChoice(uint256 raceId, string calldata choice, uint256 points) public {
-        // add user to participants on the 1st choice
-        if (usersChoicesTitles[raceId][msg.sender].length == 0) {
-            gameParticipants[raceId].push(msg.sender);
-        }
-        usersChoicesTitles[raceId][msg.sender].push(choice);
-        usersChoicesPoints[raceId][msg.sender].push(points);
-    }
-
-    function setPointsPerPerksForRace(
+    function BULLRUN_makeChoice(
         uint256 raceId, 
-        int256[3][3] calldata points
+        uint256 perk1Index,
+        uint256 perk2Index
     ) public {
+        require(perk1Index < 3, "Invalid perk 1 index");
+        require(perk2Index < 3, "Invalid perk 2 index");
+
+        int256 points = BULLRUN_pointsPerPerks[raceId][perk1Index][perk2Index];
+
+        BULLRUN_usersChoices[raceId][msg.sender].selectedPerks.push(perk1Index);
+        BULLRUN_usersChoices[raceId][msg.sender].points += points;
+    }
+
+    function BULLRUN_setPointsPerPerksForRace(uint256 raceId, int256[3][3] calldata points) public {
         require(points.length > 0, "Points matrix cannot be empty");
         for (uint256 i = 0; i < points.length; i++) {
-            pointsPerPerks[raceId][i] = new int256[](points[i].length);
+            BULLRUN_pointsPerPerks[raceId][i] = new int256[](points[i].length);
 
             for (uint256 j = 0; j < points[i].length; j++) {
-                pointsPerPerks[raceId][i][j] = points[i][j];
+                BULLRUN_pointsPerPerks[raceId][i][j] = points[i][j];
             }
         }
     }
 
-    // used to get 3 persons will maximum points
-    function getWinnersPerGame(uint256 raceId) public view returns(
+    // used to get 3 persons with maximum points
+    function BULLRUN_getWinnersPerGame(uint256 raceId) public view returns (
         address user1,
         address user2,
         address user3
     ) {
-        uint256 highest = 0;
-        uint256 secondHighest = 0;
-        uint256 thirdHighest = 0;
+        int256 highest = 0;
+        int256 secondHighest = 0;
+        int256 thirdHighest = 0;
 
         address highestUser = address(0);
         address secondHighestUser = address(0);
         address thirdHighestUser = address(0);
 
-        if (gameParticipants[raceId].length > 0) {
+        if (BULLRUN_gameParticipants[raceId].length > 0) {
             // loop through the participants
-            for (uint256 i = 0; i < gameParticipants[raceId].length; i++) {
-                address participant = gameParticipants[raceId][i];
-                uint256 points = getAmountOfPointsPerGame(participant, raceId);
+            for (uint256 i = 0; i < BULLRUN_gameParticipants[raceId].length; i++) {
+                address participant = BULLRUN_gameParticipants[raceId][i];
+                int256 points = BULLRUN_getAmountOfPointsPerGame(participant, raceId);
 
                 if (points > highest) {
                     thirdHighest      = secondHighest;
@@ -100,14 +93,16 @@ contract GAME_Bullrun {
         return (highestUser, secondHighestUser, thirdHighestUser);
     }
 
-
-    function getPerksMatrix(uint256 raceId) public view returns (int256[3][3] memory perksMatrix) {
+    function BULLRUN_getPerksMatrix(uint256 raceId) public view returns (int256[3][3] memory perksMatrix) {
         for (uint256 i = 0; i < 3; i++) {
             for (uint256 j = 0; j < 3; j++) {
-                perksMatrix[i][j] = pointsPerPerks[raceId][i][j];
+                perksMatrix[i][j] = BULLRUN_pointsPerPerks[raceId][i][j];
             }
         }
     }
 
-
-} 
+    // function to retrieve user choices
+    function BULLRUN_getUserChoicesPerks(uint256 raceId, address user) public view returns (uint256[] memory) {
+        return BULLRUN_usersChoices[raceId][user].selectedPerks;
+    }
+}

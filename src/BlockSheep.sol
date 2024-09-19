@@ -6,10 +6,8 @@ import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.s
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import { GAME_Bullrun } from "./GAME_Bullrun.sol";
 
-contract BlockSheep is Ownable {
+contract BlockSheep is Ownable, GAME_Bullrun {
     using SafeERC20 for IERC20;
-
-    GAME_Bullrun BULLRUN;
 
     uint8 private constant NUM_OF_PLAYERS_PER_RACE = 3;
     uint64 private constant MIN_SECONDS_BEFORE_START_RACE = 5 minutes;
@@ -145,7 +143,6 @@ contract BlockSheep is Ownable {
         UNDERLYING = IERC20(_underlying);
         COST = _cost;
         userHasAdminAccess[owner] = true;
-        BULLRUN = new GAME_Bullrun(address(this));
     }
 
     function deposit(uint256 amount) external {
@@ -367,7 +364,8 @@ contract BlockSheep is Ownable {
 
         _race.numOfQuestions = _numOfQuestions;
 
-        BULLRUN.setPointsPerPerksForRace(nextRaceId, points);
+        
+        BULLRUN_setPointsPerPerksForRace(nextRaceId, points);
 
         nextRaceId++;
     }
@@ -468,7 +466,7 @@ contract BlockSheep is Ownable {
         }
 
         if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("bullrun"))) {
-            (address user1, address user2, address user3) = BULLRUN.getWinnersPerGame(raceId);
+            (address user1, address user2, address user3) = BULLRUN_getWinnersPerGame(raceId);
 
             if (user1 == msg.sender) return 3;
             if (user2 == msg.sender) return 2;
@@ -555,30 +553,4 @@ contract BlockSheep is Ownable {
         return RaceStatus.STARTED;
     }
 
-
-    // BULLRUN FUNCTIONS
-    function BULLRUN_setPointsPerPerksForRace(uint256 raceId, int256[3][3] calldata points) public onlyOwner {
-        validateRaceId(raceId);
-        BULLRUN.setPointsPerPerksForRace(raceId, points);
-    }
-
-    function BULLRUN_makeChoice(uint256 raceId, string calldata choice, uint256 points) public {
-        validateRaceId(raceId);
-        BULLRUN.makeChoice(raceId, choice, points);
-    }
-
-    function BULLRUN_getAmountOfPointsPerGame(address user, uint256 raceId) public view returns(uint256 points) {
-        validateRaceId(raceId);
-        return BULLRUN.getAmountOfPointsPerGame(user, raceId);
-    }
-
-    function BULLRUN_getWinnersPerGame(uint256 raceId) public view returns (address, address, address) {
-        validateRaceId(raceId);
-        return BULLRUN.getWinnersPerGame(raceId);
-    }
-
-    function BULLRUN_getPerksMatrix(uint256 raceId) public view returns (int256[3][3] memory perksMatrix) {
-        validateRaceId(raceId);
-        return BULLRUN.getPerksMatrix(raceId);
-    }
 }
