@@ -5,6 +5,14 @@ import { BlockSheep } from "./BlockSheep.sol";
 contract GAME_Bullrun {
     BlockSheep PARENT_BLOCKSHEEP;
 
+    // Struct to track user rooms
+    struct BULLRUN_Room {
+        int256 userPerkIndex;
+        int256 opponentPerkIndex;
+        bool userPerkWasSet;
+        bool opponentPerkWasSet;
+    }
+
     // Struct to hold user choices and points
     struct BULLRUN_UserChoices {
         uint256[] selectedPerks;
@@ -12,20 +20,18 @@ contract GAME_Bullrun {
     }
 
     // user choices and points by raceId and user address
-    //      raceId         user-addr    UserChoices
     mapping(uint256 => mapping(address => BULLRUN_UserChoices)) private BULLRUN_usersChoices;
 
-    // points per perks per gameId
-    //       raceId           perk-name   points
+    // Unique identifier for each session
+    mapping(uint256 => mapping(address => mapping(address => BULLRUN_Room))) private BULLRUN_gameSessions;
+
+    // points per perks per raceId
     mapping(uint256 => mapping(uint256 => int256[])) public BULLRUN_pointsPerPerks;
 
     // Track users who have participated in each game
-    //      raceId      user-addrs
     mapping(uint256 => address[]) public BULLRUN_gameParticipants;
 
-    constructor(
-        address blocksheepAddress
-    ) {
+    constructor(address blocksheepAddress) {
         PARENT_BLOCKSHEEP = BlockSheep(blocksheepAddress);
     }
 
@@ -34,26 +40,69 @@ contract GAME_Bullrun {
     }
 
     function BULLRUN_makeChoice(
-        uint256 raceId, 
-        uint256 perk1Index,
-        uint256 perk2Index
+        uint256 raceId,
+        uint256 perkIndex,
+        address opponentAddress
     ) public {
         PARENT_BLOCKSHEEP.validateGameCompletion(raceId, "rabbit-hole");
-        require(perk1Index < 3, "Invalid perk 1 index");
-        require(perk2Index < 3, "Invalid perk 2 index");
+        require(perkIndex < 3, "Invalid perk index");
 
-        int256 points = BULLRUN_pointsPerPerks[raceId][perk1Index][perk2Index];
+        // Ensure the opponent is not the same as the caller
+        require(msg.sender != opponentAddress, "Cannot play against yourself");
 
-        BULLRUN_usersChoices[raceId][msg.sender].selectedPerks.push(perk1Index);
-        BULLRUN_usersChoices[raceId][msg.sender].points += points;
+        // Retrieve or initialize the session for the current race and opponent
+        BULLRUN_Room storage currentRoom = BULLRUN_gameSessions[raceId][msg.sender][opponentAddress];
+
+        // Set the perks based on the caller's role
+        if (!currentRoom.userPerkWasSet) {
+            currentRoom.userPerkIndex = int256(perkIndex);
+            currentRoom.userPerkWasSet = true;
+        } else {
+            revert("User perk already set for this round");
+        }
+
+        BULLRUN_Room storage opponentRoom = BULLRUN_gameSessions[raceId][opponentAddress][msg.sender];
+        if (currentRoom.userPerkWasSet && opponentRoom.userPerkWasSet) {
+            // Both choices have been made, calculate points and reset state
+            int256 userPoints     = BULLRUN_pointsPerPerks[raceId][uint256(currentRoom.userPerkIndex)][uint256(opponentRoom.userPerkIndex)];
+            int256 opponentPoints = BULLRUN_pointsPerPerks[raceId][uint256(opponentRoom.userPerkIndex)][uint256(currentRoom.userPerkIndex)];
+            
+            // Update points for both user and opponent
+            BULLRUN_usersChoices[raceId][msg.sender].points      += userPoints;
+            BULLRUN_usersChoices[raceId][opponentAddress].points += opponentPoints;
+
+            // Reset the state for the next round
+            delete BULLRUN_gameSessions[raceId][msg.sender][opponentAddress];
+            delete BULLRUN_gameSessions[raceId][opponentAddress][msg.sender];
+        }
+
+        // Record both users' participation if not already recorded
+        if (!isParticipant(raceId, msg.sender)) {
+            BULLRUN_gameParticipants[raceId].push(msg.sender);
+        }
+        if (!isParticipant(raceId, opponentAddress)) {
+            BULLRUN_gameParticipants[raceId].push(opponentAddress);
+        }
+    }
+
+    // Utility function to check if a user has already participated in a race
+    function isParticipant(uint256 raceId, address user) internal view returns (bool) {
+        for (uint256 i = 0; i < BULLRUN_gameParticipants[raceId].length; i++) {
+            if (BULLRUN_gameParticipants[raceId][i] == user) {
+                return true;
+            }
+        }
+        return false;
     }
 
     function BULLRUN_setPointsPerPerksForRace(uint256 raceId, int256[3][3] calldata points) public {
-        PARENT_BLOCKSHEEP.validateRaceId(raceId);
+        if (PARENT_BLOCKSHEEP.userHasAdminAccess(msg.sender) == false) {
+            revert("Sender is not an admin");
+        }
+
         require(points.length > 0, "Points matrix cannot be empty");
         for (uint256 i = 0; i < points.length; i++) {
             BULLRUN_pointsPerPerks[raceId][i] = new int256[](points[i].length);
-
             for (uint256 j = 0; j < points[i].length; j++) {
                 BULLRUN_pointsPerPerks[raceId][i][j] = points[i][j];
             }
@@ -82,20 +131,20 @@ contract GAME_Bullrun {
                 int256 points = BULLRUN_getAmountOfPointsPerGame(participant, raceId);
 
                 if (points > highest) {
-                    thirdHighest      = secondHighest;
-                    thirdHighestUser  = secondHighestUser;
-                    secondHighest     = highest;
+                    thirdHighest = secondHighest;
+                    thirdHighestUser = secondHighestUser;
+                    secondHighest = highest;
                     secondHighestUser = highestUser;
-                    highest           = points;
-                    highestUser       = participant;
+                    highest = points;
+                    highestUser = participant;
                 } else if (points > secondHighest) {
-                    thirdHighest      = secondHighest;
-                    thirdHighestUser  = secondHighestUser;
-                    secondHighest     = points;
+                    thirdHighest = secondHighest;
+                    thirdHighestUser = secondHighestUser;
+                    secondHighest = points;
                     secondHighestUser = participant;
                 } else if (points > thirdHighest) {
-                    thirdHighest      = points;
-                    thirdHighestUser  = participant;
+                    thirdHighest = points;
+                    thirdHighestUser = participant;
                 }
             }
         }
@@ -113,7 +162,7 @@ contract GAME_Bullrun {
     }
 
     // function to retrieve user choices titles
-    function BULLRUN_getUserChoicesTitles(uint256 raceId, address user) public view returns (uint256[] memory) {
+    function BULLRUN_getUserChoicesIndexes(uint256 raceId, address user) public view returns (uint256[] memory) {
         PARENT_BLOCKSHEEP.validateRaceId(raceId);
         return BULLRUN_usersChoices[raceId][user].selectedPerks;
     }

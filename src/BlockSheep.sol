@@ -38,6 +38,7 @@ contract BlockSheep is Ownable, GAME_Bullrun {
     struct QuestionInfo {
         string content;
         string[] answers;
+        string imgUrl;
     }
 
     struct QuestionInfoReturnType {
@@ -350,8 +351,7 @@ contract BlockSheep is Ownable, GAME_Bullrun {
             revert AccessDenied();
         }
         uint64 startAt = uint64(block.timestamp + (hoursBeforeFinish * 3600));
-        if (startAt < block.timestamp + MIN_SECONDS_BEFORE_START_RACE)
-            revert InvalidTimestamp();
+        if (startAt < block.timestamp + MIN_SECONDS_BEFORE_START_RACE) revert InvalidTimestamp();
         if (games.length == 0) revert EmptyQuestions();
         Race storage _race = races[nextRaceId];
         _race.name = name;

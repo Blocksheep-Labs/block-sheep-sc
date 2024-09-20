@@ -9,11 +9,11 @@ contract AddQuestionTest is BlockSheepTest {
     function test_AddQuestionAsOwner() public {
         vm.startPrank(owner);
         blockSheep.addQuestion(
-            BlockSheep.QuestionInfo({content: question, answers: _getAnswers()})
+            BlockSheep.QuestionInfo({content: question, answers: _getAnswers(), imgUrl: ""})
         );
         vm.stopPrank();
 
-        string memory questionInfo = blockSheep.questions(
+        (string memory questionInfo, ) = blockSheep.questions(
             0
         );
         assertEq(questionInfo, question);
@@ -28,7 +28,7 @@ contract AddQuestionTest is BlockSheepTest {
         );
         vm.prank(address(2));
         blockSheep.addQuestion(
-            BlockSheep.QuestionInfo({content: question, answers: _getAnswers()})
+            BlockSheep.QuestionInfo({content: question, answers: _getAnswers(), imgUrl: ""})
         );
     }
 
