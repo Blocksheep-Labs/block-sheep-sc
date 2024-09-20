@@ -3,7 +3,7 @@ import "../lib/forge-std/src/Script.sol";
 
 contract AddAdmin is Script {
     BlockSheep internal blockSheep =
-        BlockSheep(0xC31d4F4BfEe38421a1F7704D0632d6F2b15B44ef);
+        BlockSheep(0x26D345faC6F304D7Ecb9dA21DE0C783f05A37cAe);
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");

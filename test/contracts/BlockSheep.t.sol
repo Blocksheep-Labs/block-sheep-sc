@@ -65,11 +65,21 @@ contract BlockSheepTest is Test {
         games[0].questionIds[0] = 0;
         games[0].questionIds[1] = 1;
         games[0].questionIds[2] = 2;
+        
+        
         int256[3][3] memory bullrunPoints = [
             [int256(-1), int256(-2), int256(3)],
             [int256(1), int256(0), int256(0)],
             [int256(-1), int256(1), int256(1)]
         ];
+        
+        /*
+        int256[3][3] memory bullrunPoints = [
+            [int256(2), int256(2), int256(2)],
+            [int256(2), int256(2), int256(2)],
+            [int256(2), int256(2), int256(2)]
+        ];
+        */
 
         blockSheep.addRace("Race 1", 2, 3, games, bullrunPoints);
     }

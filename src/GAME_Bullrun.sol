@@ -7,10 +7,11 @@ contract GAME_Bullrun {
 
     // Struct to track user rooms
     struct BULLRUN_Room {
-        int256 userPerkIndex;
-        int256 opponentPerkIndex;
+        uint256 userPerkIndex;
+        uint256 opponentPerkIndex;
         bool userPerkWasSet;
         bool opponentPerkWasSet;
+        bool distributed;
     }
 
     // Struct to hold user choices and points
@@ -23,6 +24,7 @@ contract GAME_Bullrun {
     mapping(uint256 => mapping(address => BULLRUN_UserChoices)) private BULLRUN_usersChoices;
 
     // Unique identifier for each session
+    //       raceId             user             opponent     
     mapping(uint256 => mapping(address => mapping(address => BULLRUN_Room))) private BULLRUN_gameSessions;
 
     // points per perks per raceId
@@ -31,50 +33,57 @@ contract GAME_Bullrun {
     // Track users who have participated in each game
     mapping(uint256 => address[]) public BULLRUN_gameParticipants;
 
+
+    mapping(uint256 => mapping(address => mapping(address => bool))) private BULLRUN_opponentsPlayed;
+
     constructor(address blocksheepAddress) {
         PARENT_BLOCKSHEEP = BlockSheep(blocksheepAddress);
     }
 
+    // function to retrieve user points
     function BULLRUN_getAmountOfPointsPerGame(address user, uint256 raceId) public view returns (int256) {
+        PARENT_BLOCKSHEEP.validateRaceId(raceId);
         return BULLRUN_usersChoices[raceId][user].points;
     }
+
+    // function to retrieve user choices indexes
+    function BULLRUN_getUserChoicesIndexes(uint256 raceId, address user) public view returns (uint256[] memory) {
+        PARENT_BLOCKSHEEP.validateRaceId(raceId);
+        return BULLRUN_usersChoices[raceId][user].selectedPerks;
+    }
+
 
     function BULLRUN_makeChoice(
         uint256 raceId,
         uint256 perkIndex,
         address opponentAddress
     ) public {
-        PARENT_BLOCKSHEEP.validateGameCompletion(raceId, "rabbit-hole");
+        //PARENT_BLOCKSHEEP.validateGameCompletion(raceId, "rabbit-hole");
         require(perkIndex < 3, "Invalid perk index");
 
         // Ensure the opponent is not the same as the caller
         require(msg.sender != opponentAddress, "Cannot play against yourself");
+
+
+        // player should not play with repeated opp
+        require(!BULLRUN_opponentsPlayed[raceId][msg.sender][opponentAddress], "Already played with this opponent");
+        BULLRUN_opponentsPlayed[raceId][msg.sender][opponentAddress] = true;
+
 
         // Retrieve or initialize the session for the current race and opponent
         BULLRUN_Room storage currentRoom = BULLRUN_gameSessions[raceId][msg.sender][opponentAddress];
 
         // Set the perks based on the caller's role
         if (!currentRoom.userPerkWasSet) {
-            currentRoom.userPerkIndex = int256(perkIndex);
+            currentRoom.userPerkIndex = uint256(perkIndex);
             currentRoom.userPerkWasSet = true;
         } else {
             revert("User perk already set for this round");
         }
 
         BULLRUN_Room storage opponentRoom = BULLRUN_gameSessions[raceId][opponentAddress][msg.sender];
-        if (currentRoom.userPerkWasSet && opponentRoom.userPerkWasSet) {
-            // Both choices have been made, calculate points and reset state
-            int256 userPoints     = BULLRUN_pointsPerPerks[raceId][uint256(currentRoom.userPerkIndex)][uint256(opponentRoom.userPerkIndex)];
-            int256 opponentPoints = BULLRUN_pointsPerPerks[raceId][uint256(opponentRoom.userPerkIndex)][uint256(currentRoom.userPerkIndex)];
-            
-            // Update points for both user and opponent
-            BULLRUN_usersChoices[raceId][msg.sender].points      += userPoints;
-            BULLRUN_usersChoices[raceId][opponentAddress].points += opponentPoints;
-
-            // Reset the state for the next round
-            delete BULLRUN_gameSessions[raceId][msg.sender][opponentAddress];
-            delete BULLRUN_gameSessions[raceId][opponentAddress][msg.sender];
-        }
+        opponentRoom.opponentPerkIndex = uint256(perkIndex);
+        opponentRoom.opponentPerkWasSet = true;
 
         // Record both users' participation if not already recorded
         if (!isParticipant(raceId, msg.sender)) {
@@ -84,6 +93,52 @@ contract GAME_Bullrun {
             BULLRUN_gameParticipants[raceId].push(opponentAddress);
         }
     }
+
+    function BULLRUN_distribute(
+        uint256 raceId,
+        address opponentAddress
+    ) public {
+        // Ensure the opponent is not the same as the caller
+        require(msg.sender != opponentAddress, "Cannot play against yourself");
+
+        // Retrieve or initialize the session for the current race and opponent
+        BULLRUN_Room storage currentRoom = BULLRUN_gameSessions[raceId][msg.sender][opponentAddress];
+        BULLRUN_Room storage opponentRoom = BULLRUN_gameSessions[raceId][opponentAddress][msg.sender];
+
+        if (currentRoom.userPerkWasSet && !opponentRoom.userPerkWasSet) { // 1 user selected sth, 2nd nothing => user1 + 1 point, user2 - 1 point
+            BULLRUN_usersChoices[raceId][msg.sender].points += 1;
+            BULLRUN_usersChoices[raceId][opponentAddress].points -= 1;
+        } else if (!currentRoom.userPerkWasSet && opponentRoom.userPerkWasSet) { // 1 user selected sth, 2nd nothing => user1 + 1 point, user2 - 1 point
+            BULLRUN_usersChoices[raceId][msg.sender].points -= 1;
+            BULLRUN_usersChoices[raceId][opponentAddress].points += 1;
+        } else if (!currentRoom.userPerkWasSet && !opponentRoom.userPerkWasSet) { // both of users selected nothing => -1 for all (2 users)
+            BULLRUN_usersChoices[raceId][msg.sender].points -= 1;
+            BULLRUN_usersChoices[raceId][opponentAddress].points -= 1;
+        }
+
+        if (currentRoom.userPerkWasSet && opponentRoom.userPerkWasSet) {
+            // Both choices have been made, calculate points and reset state
+            int256 userPoints     = BULLRUN_pointsPerPerks[raceId][uint256(currentRoom.userPerkIndex)][uint256(opponentRoom.userPerkIndex)];
+            int256 opponentPoints = BULLRUN_pointsPerPerks[raceId][uint256(opponentRoom.userPerkIndex)][uint256(currentRoom.userPerkIndex)];
+            
+            // Update points for both user and opponent
+            if (!currentRoom.distributed) {
+                currentRoom.distributed = true;
+                BULLRUN_usersChoices[raceId][msg.sender].points += userPoints;
+                // Update selected perks
+                BULLRUN_usersChoices[raceId][msg.sender].selectedPerks.push(currentRoom.userPerkIndex);
+            }
+
+            if (!opponentRoom.distributed) {
+                opponentRoom.distributed = true;
+                BULLRUN_usersChoices[raceId][opponentAddress].points += opponentPoints;
+                // Update selected perks
+                BULLRUN_usersChoices[raceId][opponentAddress].selectedPerks.push(opponentRoom.userPerkIndex);
+            }
+        }
+
+    }
+
 
     // Utility function to check if a user has already participated in a race
     function isParticipant(uint256 raceId, address user) internal view returns (bool) {
@@ -159,11 +214,5 @@ contract GAME_Bullrun {
                 perksMatrix[i][j] = BULLRUN_pointsPerPerks[raceId][i][j];
             }
         }
-    }
-
-    // function to retrieve user choices titles
-    function BULLRUN_getUserChoicesIndexes(uint256 raceId, address user) public view returns (uint256[] memory) {
-        PARENT_BLOCKSHEEP.validateRaceId(raceId);
-        return BULLRUN_usersChoices[raceId][user].selectedPerks;
     }
 }
