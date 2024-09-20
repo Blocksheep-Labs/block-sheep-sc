@@ -332,6 +332,7 @@ contract BlockSheep is Ownable, GAME_Bullrun {
         QuestionInfo storage _question = questions[nextQuestionId];
         _question.content = params.content;
         _question.answers = params.answers;
+        _question.imgUrl = params.imgUrl;
         nextQuestionId++;
     }
 
