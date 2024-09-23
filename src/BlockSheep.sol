@@ -489,7 +489,10 @@ contract BlockSheep is Ownable, GAME_Bullrun {
         return 0;
     }
 
-    function getScoreAtRaceOfUser(uint256 raceId, address user) external view returns (uint256) {
+    function getScoreAtRaceOfUser(
+        uint256 raceId, 
+        address user
+    ) external view returns (uint256) {
         uint256 scores = 0;
         Race storage race = races[raceId];
         

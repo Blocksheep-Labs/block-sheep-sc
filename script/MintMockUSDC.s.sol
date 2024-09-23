@@ -10,7 +10,7 @@ contract MintMockUSDC is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        usdc.mint(0xd8Fa137051acD7f3964524485be4b9A10CA22E94, 1000*10**6);
+        usdc.mint(0x430EfD6d64E0AA04575D4e1bc60931Fc42C3a73A, 1000*10**6);
 
         vm.stopBroadcast();
     }
