@@ -106,37 +106,51 @@ contract GAME_Bullrun {
         BULLRUN_Room storage opponentRoom = BULLRUN_gameSessions[raceId][opponentAddress][msg.sender];
 
         if (currentRoom.userPerkWasSet && !opponentRoom.userPerkWasSet) { // 1 user selected sth, 2nd nothing => user1 + 1 point, user2 - 1 point
-            BULLRUN_usersChoices[raceId][msg.sender].points += 1;
-            BULLRUN_usersChoices[raceId][opponentAddress].points -= 1;
+            if (!currentRoom.distributed) {
+                BULLRUN_usersChoices[raceId][msg.sender].points += 1;
+                BULLRUN_usersChoices[raceId][msg.sender].selectedPerks.push(currentRoom.userPerkIndex);
+            }
+            if (!opponentRoom.distributed) {
+                BULLRUN_usersChoices[raceId][opponentAddress].points -= 1;
+                BULLRUN_usersChoices[raceId][opponentAddress].selectedPerks.push(1);
+            }
         } else if (!currentRoom.userPerkWasSet && opponentRoom.userPerkWasSet) { // 1 user selected sth, 2nd nothing => user1 + 1 point, user2 - 1 point
-            BULLRUN_usersChoices[raceId][msg.sender].points -= 1;
-            BULLRUN_usersChoices[raceId][opponentAddress].points += 1;
+            if (!currentRoom.distributed) {
+                BULLRUN_usersChoices[raceId][msg.sender].points -= 1;
+                BULLRUN_usersChoices[raceId][msg.sender].selectedPerks.push(1);
+            }
+            if (!opponentRoom.distributed) {
+                BULLRUN_usersChoices[raceId][opponentAddress].points += 1;
+                BULLRUN_usersChoices[raceId][opponentAddress].selectedPerks.push(opponentRoom.userPerkIndex);
+            }
         } else if (!currentRoom.userPerkWasSet && !opponentRoom.userPerkWasSet) { // both of users selected nothing => -1 for all (2 users)
-            BULLRUN_usersChoices[raceId][msg.sender].points -= 1;
-            BULLRUN_usersChoices[raceId][opponentAddress].points -= 1;
+            if (!currentRoom.distributed) {
+                BULLRUN_usersChoices[raceId][msg.sender].points -= 1;
+                BULLRUN_usersChoices[raceId][msg.sender].selectedPerks.push(1);
+            }
+            if (!opponentRoom.distributed) {
+                BULLRUN_usersChoices[raceId][opponentAddress].points -= 1;
+                BULLRUN_usersChoices[raceId][opponentAddress].selectedPerks.push(1);
+            }
         }
 
-        if (currentRoom.userPerkWasSet && opponentRoom.userPerkWasSet) {
-            // Both choices have been made, calculate points and reset state
-            int256 userPoints     = BULLRUN_pointsPerPerks[raceId][uint256(currentRoom.userPerkIndex)][uint256(opponentRoom.userPerkIndex)];
-            int256 opponentPoints = BULLRUN_pointsPerPerks[raceId][uint256(opponentRoom.userPerkIndex)][uint256(currentRoom.userPerkIndex)];
-            
+        if (currentRoom.userPerkWasSet && opponentRoom.userPerkWasSet) {  
             // Update points for both user and opponent
             if (!currentRoom.distributed) {
-                currentRoom.distributed = true;
+                int256 userPoints = BULLRUN_pointsPerPerks[raceId][uint256(currentRoom.userPerkIndex)][uint256(opponentRoom.userPerkIndex)];
                 BULLRUN_usersChoices[raceId][msg.sender].points += userPoints;
-                // Update selected perks
                 BULLRUN_usersChoices[raceId][msg.sender].selectedPerks.push(currentRoom.userPerkIndex);
             }
 
             if (!opponentRoom.distributed) {
-                opponentRoom.distributed = true;
+                int256 opponentPoints = BULLRUN_pointsPerPerks[raceId][uint256(opponentRoom.userPerkIndex)][uint256(currentRoom.userPerkIndex)];
                 BULLRUN_usersChoices[raceId][opponentAddress].points += opponentPoints;
-                // Update selected perks
                 BULLRUN_usersChoices[raceId][opponentAddress].selectedPerks.push(opponentRoom.userPerkIndex);
             }
         }
 
+        currentRoom.distributed = true;
+        opponentRoom.distributed = true;
     }
 
 
@@ -171,9 +185,9 @@ contract GAME_Bullrun {
         address user3
     ) {
         PARENT_BLOCKSHEEP.validateRaceId(raceId);
-        int256 highest = 0;
-        int256 secondHighest = 0;
-        int256 thirdHighest = 0;
+        int256 highest = type(int256).min;
+        int256 secondHighest = type(int256).min;
+        int256 thirdHighest = type(int256).min;
 
         address highestUser = address(0);
         address secondHighestUser = address(0);

@@ -510,6 +510,11 @@ contract BlockSheep is Ownable, GAME_Bullrun {
 
         scores += pointsRabbitTunnel;
 
+        (address user1, address user2, address user3) = BULLRUN_getWinnersPerGame(raceId);
+        if (user1 == user) scores += 3;
+        if (user2 == user) scores += 2;
+        if (user3 == user) scores += 1;
+
         return scores;
     }
 
