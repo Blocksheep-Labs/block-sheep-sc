@@ -17,7 +17,7 @@ contract BlockSheep is Ownable, GAME_Bullrun {
     uint256 public immutable COST;
 
     mapping(address => uint256) public balances;
-    uint256 public feeCollected;
+
     // questionId => question
     mapping(uint256 => QuestionInfo) public questions;
 

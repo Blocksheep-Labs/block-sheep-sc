@@ -3,13 +3,13 @@ import "../lib/forge-std/src/Script.sol";
 
 contract AddAdmin is Script {
     BlockSheep internal blockSheep =
-        BlockSheep(0x23608048dc2C481808c0219bfC8d2CEc1ae1f64D);
+        BlockSheep(0x181b8bf1E2B454f0F2B17826cd5898c529BAc696);
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        blockSheep.setAdminRights(0x430EfD6d64E0AA04575D4e1bc60931Fc42C3a73A, true);
+        blockSheep.setAdminRights(0xA5Fb97059479d610F6be759A6078B53Ed25f470e, true);
 
         vm.stopBroadcast();
     }
