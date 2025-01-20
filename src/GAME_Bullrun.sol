@@ -3,7 +3,7 @@ pragma solidity ^0.8.0;
 import { BlockSheep } from "./BlockSheep.sol";
 
 contract GAME_Bullrun {
-    BlockSheep PARENT_BLOCKSHEEP;
+    BlockSheep BULLRUN_Parent;
 
     // Struct to track user rooms
     struct BULLRUN_Room {
@@ -37,18 +37,18 @@ contract GAME_Bullrun {
     mapping(uint256 => mapping(address => mapping(address => bool))) private BULLRUN_opponentsPlayed;
 
     constructor(address blocksheepAddress) {
-        PARENT_BLOCKSHEEP = BlockSheep(blocksheepAddress);
+        BULLRUN_Parent = BlockSheep(blocksheepAddress);
     }
 
     // function to retrieve user points
     function BULLRUN_getAmountOfPointsPerGame(address user, uint256 raceId) public view returns (int256) {
-        PARENT_BLOCKSHEEP.validateRaceId(raceId);
+        BULLRUN_Parent.validateRaceId(raceId);
         return BULLRUN_usersChoices[raceId][user].points;
     }
 
     // function to retrieve user choices indexes
     function BULLRUN_getUserChoicesIndexes(uint256 raceId, address user) public view returns (uint256[] memory) {
-        PARENT_BLOCKSHEEP.validateRaceId(raceId);
+        BULLRUN_Parent.validateRaceId(raceId);
         return BULLRUN_usersChoices[raceId][user].selectedPerks;
     }
 
@@ -164,8 +164,8 @@ contract GAME_Bullrun {
         return false;
     }
 
-    function BULLRUN_setPointsPerPerksForRace(uint256 raceId, int256[3][3] calldata points) public {
-        if (PARENT_BLOCKSHEEP.userHasAdminAccess(msg.sender) == false) {
+    function BULLRUN_init(uint256 raceId, int256[3][3] calldata points) public {
+        if (BULLRUN_Parent.userHasAdminAccess(msg.sender) == false) {
             revert("Sender is not an admin");
         }
 
@@ -184,7 +184,7 @@ contract GAME_Bullrun {
         address user2,
         address user3
     ) {
-        PARENT_BLOCKSHEEP.validateRaceId(raceId);
+        BULLRUN_Parent.validateRaceId(raceId);
         int256 highest = type(int256).min;
         int256 secondHighest = type(int256).min;
         int256 thirdHighest = type(int256).min;
@@ -222,7 +222,7 @@ contract GAME_Bullrun {
     }
 
     function BULLRUN_getPerksMatrix(uint256 raceId) public view returns (int256[3][3] memory perksMatrix) {
-        PARENT_BLOCKSHEEP.validateRaceId(raceId);
+        BULLRUN_Parent.validateRaceId(raceId);
         for (uint256 i = 0; i < 3; i++) {
             for (uint256 j = 0; j < 3; j++) {
                 perksMatrix[i][j] = BULLRUN_pointsPerPerks[raceId][i][j];
