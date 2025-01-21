@@ -4,26 +4,17 @@ pragma solidity ^0.8.20;
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { GAME_Bullrun } from "./GAME_Bullrun.sol";
-import { GAME_RabbitHole } from "./GAME_RabbitHole.sol";
-import { GAME_Underdog } from "./GAME_Underdog.sol";
 
-contract BlockSheep is Ownable, GAME_Bullrun, GAME_RabbitHole, GAME_Underdog {
+
+contract BlockSheep is Ownable {
     using SafeERC20 for IERC20;
 
-    uint8 private constant NUM_OF_PLAYERS_PER_RACE = 3;
     uint64 private constant MIN_SECONDS_BEFORE_START_RACE = 5 minutes;
-    uint64 private constant GAME_DURATION = 5 * 60;
 
     IERC20 public immutable UNDERLYING;
     uint256 public immutable COST;
 
     mapping(address => uint256) public balances;
-    uint256 public feeCollected;
-
-    uint256 private nextQuestionId;
-
-    uint256 private nextGameNameId;
 
     mapping(uint256 => Race) private races;
 
@@ -31,6 +22,9 @@ contract BlockSheep is Ownable, GAME_Bullrun, GAME_RabbitHole, GAME_Underdog {
 
     // list of admin access
     mapping(address => bool) public userHasAdminAccess;
+
+    mapping(string => address) public targetContracts;
+
 
     enum RaceStatus {
         NON_EXIST,
@@ -65,14 +59,12 @@ contract BlockSheep is Ownable, GAME_Bullrun, GAME_RabbitHole, GAME_Underdog {
     error EmptyQuestions();
     error InvalidRaceId();
     error InvalidGameIndex();
-    error LengthMismatch();
     error Timeout();
     error AlreadyDistributed();
     error AlreadyRegistered();
     error RaceIsFull();
     error NotRegistered();
     error AccessDenied();
-    error GameIsNotComplted();
 
     event Registered(address user, uint256 amount);
 
@@ -80,7 +72,7 @@ contract BlockSheep is Ownable, GAME_Bullrun, GAME_RabbitHole, GAME_Underdog {
         address _underlying,
         address owner,
         uint256 _cost
-    ) Ownable(owner) GAME_Bullrun(address(this)) GAME_RabbitHole(address(this)) GAME_Underdog(address(this)) {
+    ) Ownable(owner) {
         UNDERLYING = IERC20(_underlying);
         COST = _cost;
         userHasAdminAccess[owner] = true;
@@ -144,12 +136,31 @@ contract BlockSheep is Ownable, GAME_Bullrun, GAME_RabbitHole, GAME_Underdog {
         }
     }
 
+        // Set the address for a specific contract
+    function registerContract(string memory name, address contractAddress) external {
+        targetContracts[name] = contractAddress;
+    }
+
+
+    function callFunctionAtRegisteredContract (
+        string memory contractName,
+        bytes memory data
+    ) public returns (bytes memory) {
+        address target = targetContracts[contractName];
+        require(target != address(0), "Target was not found");
+
+        (bool success, bytes memory returnData) = target.delegatecall(data);
+        require(success, "Delegatecall failed");
+
+        return returnData;
+    }
+
     /// Admin functions
     function addRace(
         uint64 hoursBeforeFinish,
         uint8 numOfPlayersRequired,
-        int256[3][3] calldata points,
-        QuestionInfo[] calldata questions
+        bytes calldata initStateForBullrun, //int256[3][3] calldata points,
+        bytes calldata initStateForUnderdog //QuestionInfo[] calldata questions
     ) external {
         if (userHasAdminAccess[msg.sender] == false && msg.sender != owner()) {
             revert AccessDenied();
@@ -161,8 +172,11 @@ contract BlockSheep is Ownable, GAME_Bullrun, GAME_RabbitHole, GAME_Underdog {
         _race.numOfPlayersRequired = numOfPlayersRequired;
         _race.startAt = startAt;
 
-        BULLRUN_init(nextRaceId, points);
-        UNDERDOG_init(nextRaceId, questions);
+        // init underdog
+        callFunctionAtRegisteredContract("UNDERDOG", initStateForUnderdog);
+
+        // init bullrun
+        callFunctionAtRegisteredContract("BULLRUN", initStateForBullrun);
 
         nextRaceId++;
     }
@@ -185,11 +199,6 @@ contract BlockSheep is Ownable, GAME_Bullrun, GAME_RabbitHole, GAME_Underdog {
     {
         Race storage race = races[id];
         startAt = race.startAt;
-        
-        // Populate the games array with gameIds
-
-
-        // populate gamesCompleted per race
 
         raceDuration = 1;
 
@@ -197,76 +206,15 @@ contract BlockSheep is Ownable, GAME_Bullrun, GAME_RabbitHole, GAME_Underdog {
 
         registeredUsers = race.registeredUsers;
 
-        // rabbitTunnel = race.rabbitTunnel;
-
         numOfPlayersRequired = race.numOfPlayersRequired;
     }
 
-    function getScoreAtGameOfUser(
-        uint256 raceId,
-        uint256 gameIndex,
-        address user,
-        string memory gameName
-    ) external view returns (uint256) {
-        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("underdog"))) {
-            // return races[raceId].games[gameIndex].scoreByAddress[user];
-            return 0;
-        } 
-
-        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("rabbit-hole"))) {
-            uint256 points = 0;
-            /*
-            for (uint256 i = 0; i < races[raceId].rabbitTunnel.pointsAddresses.length; i++) {
-                if (races[raceId].rabbitTunnel.pointsAddresses[i] == user) {
-                    points = races[raceId].rabbitTunnel.pointsAmount[i];
-                }
-            }
-            */
-            return points;
-        }
-
-        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("bullrun"))) {
-            (address user1, address user2, address user3) = BULLRUN_getWinnersPerGame(raceId);
-
-            if (user1 == msg.sender) return 3;
-            if (user2 == msg.sender) return 2;
-            if (user3 == msg.sender) return 1;
-        }
-
-        return 0;
-    }
 
     function getScoreAtRaceOfUser(
         uint256 raceId, 
         address user
     ) external view returns (uint256) {
-        uint256 scores = 0;
-        // Race storage race = races[raceId];
         
-        /*
-        for (uint256 gameId = 0; gameId < race.numOfGames; gameId++) {
-            Game storage game = race.games[gameId];
-            scores += game.scoreByAddress[user];
-        }
-        */
-
-        uint256 pointsRabbitTunnel = 0;
-        /*
-        for (uint256 i = 0; i < races[raceId].rabbitTunnel.pointsAddresses.length; i++) {
-            if (races[raceId].rabbitTunnel.pointsAddresses[i] == user) {
-                pointsRabbitTunnel = races[raceId].rabbitTunnel.pointsAmount[i];
-            }
-        }
-        */
-
-        scores += pointsRabbitTunnel;
-
-        (address user1, address user2, address user3) = BULLRUN_getWinnersPerGame(raceId);
-        if (user1 == user) scores += 3;
-        if (user2 == user) scores += 2;
-        if (user3 == user) scores += 1;
-
-        return scores;
     }
 
     function getRacesWithPagination(
@@ -288,17 +236,11 @@ contract BlockSheep is Ownable, GAME_Bullrun, GAME_RabbitHole, GAME_Underdog {
             
             _races[index].registered = race.playerRegistered[user];
 
-            
-            // Populate the games array with gameIds
-
-            //_races[index].raceDuration = GAME_DURATION * race.numOfGames;
             _races[index].raceDuration = 1;
 
             _races[index].refunded = race.refunded[user];
 
             _races[index].registeredUsers = race.registeredUsers;
-
-            // _races[index].rabbitTunnel = race.rabbitTunnel;
 
             _races[index].numOfPlayersRequired = race.numOfPlayersRequired;
         }
@@ -310,10 +252,9 @@ contract BlockSheep is Ownable, GAME_Bullrun, GAME_RabbitHole, GAME_Underdog {
         if (raceId > nextRaceId) return RaceStatus.NON_EXIST;
         Race storage race = races[raceId];
         if (race.startAt < block.timestamp) return RaceStatus.CREATED;
-        if (race.registeredUsers.length < NUM_OF_PLAYERS_PER_RACE)
-            return RaceStatus.CANCELLED;
+        //if (race.registeredUsers.length < NUM_OF_PLAYERS_PER_RACE)
+        //    return RaceStatus.CANCELLED;
 
         return RaceStatus.STARTED;
     }
-
 }

@@ -9,8 +9,6 @@ contract GAME_RabbitHole {
     mapping(uint256 => mapping(uint256 => mapping(address => uint256))) public RABBITHOLE_usersChoices;
     mapping(uint256 => mapping(uint256 => mapping(address => uint256))) public RABBITHOLE_usersRemainingFuel;
 
-    mapping(uint256 => address) public RABBITHOLE_winner;
-
     mapping(uint256 => mapping(address => uint256)) public RABBITHOLE_points;
 
     // Track users who have participated in each game
@@ -29,8 +27,15 @@ contract GAME_RabbitHole {
         BLOCKSHEEP_ADDR = blocksheep;
     }
 
+    function getPoints(uint256 raceId) public view returns (uint256) {
+        return RABBITHOLE_points[raceId][msg.sender];
+    }
 
-    function submitFuel(
+    function getUserChoices(uint256 raceId, uint256 roundIndex) public view returns (uint256) {
+        return RABBITHOLE_usersChoices[raceId][roundIndex][msg.sender];
+    }
+
+    function makeMove(
         uint256 raceId,
         uint256 fuelSubmission,
         uint256 fuelLeft,
@@ -46,31 +51,72 @@ contract GAME_RabbitHole {
         // mark user in round as participated
         RABBITHOLE_roundWasParticipated[raceId][roundIndex][msg.sender] = true;
 
-        // TODO: 
-        // get and update the player to eliminate at the round
-        // use RABBITHOLE_eliminatedAtRound, RABBITHOLE_usersChoices
+        address eliminatedUser;
+        uint256 minFuel = type(uint256).max;
+
+        address[] memory participantsAtCurrentRound = RABBITHOLE_roundParticipants[raceId][roundIndex];
+
+        // find the user with the lowest fuel (also comparing addresses)
+        for (uint256 i = 0; i < participantsAtCurrentRound.length; i++) {
+            address player = participantsAtCurrentRound[i];
+            uint256 playerFuel = RABBITHOLE_usersChoices[raceId][roundIndex][player];
+
+            if (
+                playerFuel < minFuel ||
+                (playerFuel == minFuel && player < eliminatedUser)
+            ) {
+                minFuel = playerFuel;
+                eliminatedUser = player;
+            }
+        }
+
+        // update eliminated user at the round
+        RABBITHOLE_eliminatedAtRound[raceId][roundIndex] = eliminatedUser;
     }
 
-    function finishTunnelGame(
-        uint256 raceId,
-        bool isWon,
-        uint256 pointsToAllocate
+    function distribute(
+        uint256 raceId
     ) external {
-        /*
-        RabbitTunnel storage rabbitTunnel = RABBITHOLE_tunnels[raceId];
-        rabbitTunnel.pointsAddresses.push(msg.sender);
-        rabbitTunnel.pointsAmount.push(pointsToAllocate);
+        uint256 roundIndex = 0;
 
-        rabbitTunnel.finishedBy.push(msg.sender);
-        if (isWon) {
-            rabbitTunnel.winner = msg.sender;
+        uint256[] memory points;
+        points[0] = 3; // First place
+        points[1] = 2; // Second place
+        points[2] = 1; // Third place
+
+        address[] memory topParticipants;
+
+        // determine the maximum possible round index
+        while (RABBITHOLE_eliminatedAtRound[raceId][roundIndex] != address(0)) {
+            roundIndex++;
         }
-        */
 
+        // search top players at the game
+        for (uint256 rank = 0; rank < 3 && roundIndex > 0; rank++) {
+            address eliminatedPlayer = RABBITHOLE_eliminatedAtRound[raceId][roundIndex - 1];
 
+            if (rank == 0) {
+                // winner - last non-eliminated player
+                address[] memory participantsAtRound = RABBITHOLE_roundParticipants[raceId][roundIndex - 1];
+                for (uint256 i = 0; i < participantsAtRound.length; i++) {
+                    if (participantsAtRound[i] != eliminatedPlayer) {
+                        topParticipants[rank] = participantsAtRound[i];
+                        break;
+                    }
+                }
+            } else {
+                topParticipants[rank] = eliminatedPlayer;
+            }
 
-        // TODO: based on played rounds
-        // and eliminated users in previous rounds
-        // determine the winner of the game
+            // go to the next rank
+            roundIndex--;
+        }
+
+        // allocate points to the list of top players
+        for (uint256 i = 0; i < 3; i++) {
+            if (topParticipants[i] != address(0)) {
+                RABBITHOLE_points[raceId][topParticipants[i]] = points[i];
+            }
+        }
     }
 }

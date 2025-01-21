@@ -24,6 +24,7 @@ contract GAME_Underdog {
     // Store players who answered each question for each race
     mapping(uint256 => mapping(uint8 => address[])) private UNDERDOG_answeredPlayers;
 
+
     error AlreadyAnswered();
 
     struct QuestionInfo {
@@ -41,7 +42,7 @@ contract GAME_Underdog {
         UNDERDOG_Parent = BlockSheep(blocksheepAddress);
     }
 
-    function UNDERDOG_init(
+    function initRace(
         uint256 raceId,
         QuestionInfo[] calldata questionsInfo
     ) public {
@@ -56,7 +57,30 @@ contract GAME_Underdog {
         }
     }
 
-    function submitAnswer(
+    function getWinner(uint256 raceId) public pure returns (address) {
+        return address(0);
+    }
+
+    function getPoints(uint256 raceId) public view returns (uint256) {
+        return UNDERDOG_points[raceId][msg.sender];
+    }
+
+    function getUserChoices(uint256 raceId) public view returns (uint8[] memory, uint8[] memory) {
+        uint256 questionsCount = UNDERDOG_questions[raceId].length;
+
+        uint8[] memory questionIndexes = new uint8[](questionsCount);
+        uint8[] memory userChoices = new uint8[](questionsCount);
+
+        // Loop through each question index and fetch the user's choice
+        for (uint8 i = 0; i < questionsCount; i++) {
+            questionIndexes[i] = i;
+            userChoices[i] = UNDERDOG_usersChoices[raceId][msg.sender][i];
+        }
+
+        return (questionIndexes, userChoices);
+    }
+
+    function makeMove(
         uint256 raceId,
         uint8 questionIndex,
         uint8 answerIndex
@@ -76,7 +100,7 @@ contract GAME_Underdog {
         UNDERDOG_answeredPlayers[raceId][questionIndex].push(msg.sender);
     }
 
-    function distributeReward(
+    function distribute(
         uint256 raceId
     ) external {
         UNDERDOG_Parent.validateRaceId(raceId);
@@ -86,6 +110,31 @@ contract GAME_Underdog {
             _distributeRewardOfQuestion(raceId, questionIndex);
         }
     }
+
+
+    function getRules(
+        uint256 raceId
+    ) public view returns (QuestionInfoReturnType[] memory) {
+        UNDERDOG_Parent.validateRaceId(raceId);
+
+        uint256 length = UNDERDOG_questions[raceId].length;
+
+        // Initialize an array to store QuestionInfoReturnType structs
+        QuestionInfoReturnType[] memory questionsInfo = new QuestionInfoReturnType[](length);
+
+        // Populate the questionsInfo array
+        for (uint8 i = 0; i < length; i++) {
+            questionsInfo[i] = QuestionInfoReturnType({
+                id: i,
+                info: UNDERDOG_questions[raceId][i]
+            });
+        }
+
+        // Return the populated questionsInfo array
+        return questionsInfo;
+    }
+
+
 
     function _distributeRewardOfQuestion(
         uint256 raceId,
@@ -155,28 +204,4 @@ contract GAME_Underdog {
 
         return winningAnswerId;
     }
-
-    
-    function getQuestions(
-        uint256 raceId
-    ) public view returns (QuestionInfoReturnType[] memory) {
-        UNDERDOG_Parent.validateRaceId(raceId);
-
-        uint256 length = UNDERDOG_questions[raceId].length;
-
-        // Initialize an array to store QuestionInfoReturnType structs
-        QuestionInfoReturnType[] memory questionsInfo = new QuestionInfoReturnType[](length);
-
-        // Populate the questionsInfo array
-        for (uint8 i = 0; i < length; i++) {
-            questionsInfo[i] = QuestionInfoReturnType({
-                id: i,
-                info: UNDERDOG_questions[raceId][i]
-            });
-        }
-
-        // Return the populated questionsInfo array
-        return questionsInfo;
-    }
-    
 }

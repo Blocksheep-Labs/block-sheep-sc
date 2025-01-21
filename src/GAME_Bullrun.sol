@@ -36,24 +36,26 @@ contract GAME_Bullrun {
 
     mapping(uint256 => mapping(address => mapping(address => bool))) private BULLRUN_opponentsPlayed;
 
+    
+
     constructor(address blocksheepAddress) {
         BULLRUN_Parent = BlockSheep(blocksheepAddress);
     }
 
     // function to retrieve user points
-    function BULLRUN_getAmountOfPointsPerGame(address user, uint256 raceId) public view returns (int256) {
+    function getPoints(address user, uint256 raceId) public view returns (int256) {
         BULLRUN_Parent.validateRaceId(raceId);
         return BULLRUN_usersChoices[raceId][user].points;
     }
 
     // function to retrieve user choices indexes
-    function BULLRUN_getUserChoicesIndexes(uint256 raceId, address user) public view returns (uint256[] memory) {
+    function getUserChoices(uint256 raceId, address user) public view returns (uint256[] memory) {
         BULLRUN_Parent.validateRaceId(raceId);
         return BULLRUN_usersChoices[raceId][user].selectedPerks;
     }
 
 
-    function BULLRUN_makeChoice(
+    function makeMove(
         uint256 raceId,
         uint256 perkIndex,
         address opponentAddress
@@ -86,15 +88,15 @@ contract GAME_Bullrun {
         opponentRoom.opponentPerkWasSet = true;
 
         // Record both users' participation if not already recorded
-        if (!isParticipant(raceId, msg.sender)) {
+        if (!_isParticipant(raceId, msg.sender)) {
             BULLRUN_gameParticipants[raceId].push(msg.sender);
         }
-        if (!isParticipant(raceId, opponentAddress)) {
+        if (!_isParticipant(raceId, opponentAddress)) {
             BULLRUN_gameParticipants[raceId].push(opponentAddress);
         }
     }
 
-    function BULLRUN_distribute(
+    function distribute(
         uint256 raceId,
         address opponentAddress
     ) public {
@@ -153,18 +155,7 @@ contract GAME_Bullrun {
         opponentRoom.distributed = true;
     }
 
-
-    // Utility function to check if a user has already participated in a race
-    function isParticipant(uint256 raceId, address user) internal view returns (bool) {
-        for (uint256 i = 0; i < BULLRUN_gameParticipants[raceId].length; i++) {
-            if (BULLRUN_gameParticipants[raceId][i] == user) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    function BULLRUN_init(uint256 raceId, int256[3][3] calldata points) public {
+    function initRace(uint256 raceId, int256[3][3] calldata points) public {
         if (BULLRUN_Parent.userHasAdminAccess(msg.sender) == false) {
             revert("Sender is not an admin");
         }
@@ -179,7 +170,7 @@ contract GAME_Bullrun {
     }
 
     // used to get 3 persons with maximum points
-    function BULLRUN_getWinnersPerGame(uint256 raceId) public view returns (
+    function getWinner(uint256 raceId) public view returns (
         address user1,
         address user2,
         address user3
@@ -197,7 +188,7 @@ contract GAME_Bullrun {
             // loop through the participants
             for (uint256 i = 0; i < BULLRUN_gameParticipants[raceId].length; i++) {
                 address participant = BULLRUN_gameParticipants[raceId][i];
-                int256 points = BULLRUN_getAmountOfPointsPerGame(participant, raceId);
+                int256 points = getPoints(participant, raceId);
 
                 if (points > highest) {
                     thirdHighest = secondHighest;
@@ -221,12 +212,24 @@ contract GAME_Bullrun {
         return (highestUser, secondHighestUser, thirdHighestUser);
     }
 
-    function BULLRUN_getPerksMatrix(uint256 raceId) public view returns (int256[3][3] memory perksMatrix) {
+    function getRules(uint256 raceId) public view returns (int256[3][3] memory perksMatrix) {
         BULLRUN_Parent.validateRaceId(raceId);
         for (uint256 i = 0; i < 3; i++) {
             for (uint256 j = 0; j < 3; j++) {
                 perksMatrix[i][j] = BULLRUN_pointsPerPerks[raceId][i][j];
             }
         }
+    }
+
+    
+    
+    // Utility function to check if a user has already participated in a race
+    function _isParticipant(uint256 raceId, address user) internal view returns (bool) {
+        for (uint256 i = 0; i < BULLRUN_gameParticipants[raceId].length; i++) {
+            if (BULLRUN_gameParticipants[raceId][i] == user) {
+                return true;
+            }
+        }
+        return false;
     }
 }
