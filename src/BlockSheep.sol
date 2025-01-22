@@ -35,6 +35,7 @@ contract BlockSheep is Ownable {
     }
 
     struct Race {
+        uint256 id;
         uint64 startAt;
         mapping(address => bool) playerRegistered;
         mapping(address => bool) refunded;
@@ -43,28 +44,14 @@ contract BlockSheep is Ownable {
     }
 
     struct RaceInfo {
+        uint256 id;
         uint64 startAt;
         bool registered;
         RaceStatus status;
-        uint256[] games;
-        uint256[] gamesCompletedPerUser;
-        uint256 raceDuration;
         bool refunded;
         address[] registeredUsers;
         uint8 numOfPlayersRequired;
     }
-
-
-    error InvalidTimestamp();
-    error EmptyQuestions();
-    error InvalidRaceId();
-    error InvalidGameIndex();
-    error Timeout();
-    error AlreadyDistributed();
-    error AlreadyRegistered();
-    error RaceIsFull();
-    error NotRegistered();
-    error AccessDenied();
 
     event Registered(address user, uint256 amount);
 
@@ -79,15 +66,15 @@ contract BlockSheep is Ownable {
     }
 
     function deposit(uint256 amount) external {
-        if (amount <= 0) revert("Amount to buy must be greater than zero");
+        require(amount > 0, "Amount to buy must be greater than zero");
 
         UNDERLYING.safeTransferFrom(msg.sender, address(this), amount);
         balances[msg.sender] += amount;
     }
 
     function withdraw(uint256 amount) external {
-        if (amount == 0) revert("Amount must be greater than zero");
-        if (balances[msg.sender] < amount) revert("Insufficient balance");
+        require(amount > 0, "Amount must be greater than zero");
+        require(balances[msg.sender] > amount, "Insufficient balance");
         
         balances[msg.sender] -= amount;
         UNDERLYING.safeTransfer(msg.sender, amount);
@@ -95,8 +82,8 @@ contract BlockSheep is Ownable {
 
     function refundBalance(uint256 amount, uint256 raceId) external {
         Race storage race = races[raceId];
-        if (race.startAt > block.timestamp) revert InvalidTimestamp();
-        if (race.playerRegistered[msg.sender] == false) revert NotRegistered();
+        require(race.startAt < block.timestamp, "Invalid timestamp");
+        require(race.playerRegistered[msg.sender] == true, "Not registered");
 
         balances[msg.sender] += amount;
         race.refunded[msg.sender] = true;
@@ -104,12 +91,12 @@ contract BlockSheep is Ownable {
 
     function register(uint256 raceId) external {
         Race storage race = races[raceId];
-        if (raceId >= nextRaceId) revert InvalidRaceId();
-        if (block.timestamp > race.startAt) revert InvalidTimestamp();
-        if (race.playerRegistered[msg.sender]) revert AlreadyRegistered();
-        if (race.registeredUsers.length >= race.numOfPlayersRequired) revert RaceIsFull();
+        require(raceId < nextRaceId, "Invalid race ID");
+        require(block.timestamp < race.startAt, "Invalid timestamp");
+        require(race.playerRegistered[msg.sender] == false, "Already registered");
+        require(race.registeredUsers.length < race.numOfPlayersRequired, "Race is full");
         
-        // balances[msg.sender] -= race.numOfQuestions * COST;
+        balances[msg.sender] -= COST;
         race.playerRegistered[msg.sender] = true;
         race.registeredUsers.push(msg.sender);
 
@@ -122,21 +109,10 @@ contract BlockSheep is Ownable {
     }
 
     function validateRaceId(uint256 raceId) public view {
-        if (raceId >= nextRaceId) revert InvalidRaceId();
+        require(raceId < nextRaceId, "Invalid race ID");
     }
 
-    function validateGameCompletion(uint256 raceId, string calldata gameName) public view {
-        validateRaceId(raceId);
-        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("underdog"))) {
-            // TODO: check for underdog game completion somehow (after the refactoring of the underdog game)
-        }
-        // check the rabbit-hole game to be completed
-        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("rabbit-hole"))) {
-            // if (races[raceId].rabbitTunnel.winner == address(0)) revert GameIsNotComplted();
-        }
-    }
-
-        // Set the address for a specific contract
+    // Set the address for a specific contract
     function registerContract(string memory name, address contractAddress) external {
         targetContracts[name] = contractAddress;
     }
@@ -149,8 +125,8 @@ contract BlockSheep is Ownable {
         address target = targetContracts[contractName];
         require(target != address(0), "Target was not found");
 
-        (bool success, bytes memory returnData) = target.delegatecall(data);
-        require(success, "Delegatecall failed");
+        (bool success, bytes memory returnData) = target.call(data);
+        require(success, "Call failed");
 
         return returnData;
     }
@@ -162,51 +138,66 @@ contract BlockSheep is Ownable {
         bytes calldata initStateForBullrun, //int256[3][3] calldata points,
         bytes calldata initStateForUnderdog //QuestionInfo[] calldata questions
     ) external {
-        if (userHasAdminAccess[msg.sender] == false && msg.sender != owner()) {
-            revert AccessDenied();
-        }
+        require(userHasAdminAccess[msg.sender] == true || msg.sender == owner(), "Access denied");
+        
         uint64 startAt = uint64(block.timestamp + (hoursBeforeFinish * 3600));
-        if (startAt < block.timestamp + MIN_SECONDS_BEFORE_START_RACE) revert InvalidTimestamp();
+        require(startAt > block.timestamp + MIN_SECONDS_BEFORE_START_RACE, "Invalid timestamp");
 
         Race storage _race = races[nextRaceId];
+        _race.id = nextRaceId;
         _race.numOfPlayersRequired = numOfPlayersRequired;
         _race.startAt = startAt;
 
         // init underdog
-        callFunctionAtRegisteredContract("UNDERDOG", initStateForUnderdog);
+        bytes memory underdogData = abi.encodeWithSelector(
+            bytes4(keccak256("initRace(uint256,bytes)")),
+            nextRaceId,
+            initStateForUnderdog
+        );
+        callFunctionAtRegisteredContract("UNDERDOG", underdogData);
 
         // init bullrun
-        callFunctionAtRegisteredContract("BULLRUN", initStateForBullrun);
+        bytes memory bullrunData = abi.encodeWithSelector(
+            bytes4(keccak256("initRace(uint256,bytes)")),
+            nextRaceId,
+            initStateForBullrun
+        );
+        callFunctionAtRegisteredContract("BULLRUN", bullrunData);
+
+        // init rabbithole
+        // RABBITHOLE DOES NOT REQUIRE TO CALL THE initRace FUNCTION
 
         nextRaceId++;
     }
 
 
-    function getRaces(
-        uint256 id,
-        address user
-    )
-        public
-        view
-        returns (
-            uint64 startAt,
-            uint256 raceDuration,
-            bool refunded,
-            address[] memory registeredUsers,
-            // RabbitTunnel memory rabbitTunnel,
-            uint8 numOfPlayersRequired
-        )
-    {
+    function getRaceStatus(uint256 raceId) public view returns (RaceStatus) {
+        if (raceId > nextRaceId) return RaceStatus.NON_EXIST;
+        Race storage race = races[raceId];
+        if (race.startAt < block.timestamp) return RaceStatus.CREATED;
+        //if (race.registeredUsers.length < NUM_OF_PLAYERS_PER_RACE)
+        //    return RaceStatus.CANCELLED;
+
+        return RaceStatus.STARTED;
+    }
+
+
+    function getRace(uint256 id, address user) public view returns (RaceInfo memory raceInfo) {
         Race storage race = races[id];
-        startAt = race.startAt;
 
-        raceDuration = 1;
+        raceInfo.id = race.id;
 
-        refunded = race.refunded[user];
+        raceInfo.startAt = race.startAt;
+        
+        raceInfo.registered = race.playerRegistered[user];
 
-        registeredUsers = race.registeredUsers;
+        raceInfo.refunded = race.refunded[user];
 
-        numOfPlayersRequired = race.numOfPlayersRequired;
+        raceInfo.registeredUsers = race.registeredUsers;
+
+        raceInfo.numOfPlayersRequired = race.numOfPlayersRequired;
+
+        raceInfo.status = getRaceStatus(id);
     }
 
 
@@ -232,29 +223,22 @@ contract BlockSheep is Ownable {
         RaceInfo[] memory _races = new RaceInfo[](length);
         for (uint256 index = 0; index < length; index++) {
             Race storage race = races[index];
+
+            _races[index].id = race.id;
+
             _races[index].startAt = race.startAt;
             
             _races[index].registered = race.playerRegistered[user];
-
-            _races[index].raceDuration = 1;
 
             _races[index].refunded = race.refunded[user];
 
             _races[index].registeredUsers = race.registeredUsers;
 
             _races[index].numOfPlayersRequired = race.numOfPlayersRequired;
+
+            _races[index].status = getRaceStatus(race.id);
         }
 
         return _races;
-    }
-
-    function getRaceStatus(uint256 raceId) external view returns (RaceStatus) {
-        if (raceId > nextRaceId) return RaceStatus.NON_EXIST;
-        Race storage race = races[raceId];
-        if (race.startAt < block.timestamp) return RaceStatus.CREATED;
-        //if (race.registeredUsers.length < NUM_OF_PLAYERS_PER_RACE)
-        //    return RaceStatus.CANCELLED;
-
-        return RaceStatus.STARTED;
     }
 }

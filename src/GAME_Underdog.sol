@@ -1,11 +1,8 @@
 // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.8.0;
-import { BlockSheep } from "./BlockSheep.sol";
 
 contract GAME_Underdog {
-    BlockSheep UNDERDOG_Parent;
-
     // User choices by raceId, user address, and questionIndex
     mapping(uint256 => mapping(address => mapping(uint8 => uint8))) private UNDERDOG_usersChoices;
 
@@ -25,8 +22,6 @@ contract GAME_Underdog {
     mapping(uint256 => mapping(uint8 => address[])) private UNDERDOG_answeredPlayers;
 
 
-    error AlreadyAnswered();
-
     struct QuestionInfo {
         string content;
         string[] answers;
@@ -38,18 +33,11 @@ contract GAME_Underdog {
         QuestionInfo info;
     }
 
-    constructor(address blocksheepAddress) {
-        UNDERDOG_Parent = BlockSheep(blocksheepAddress);
-    }
-
     function initRace(
         uint256 raceId,
-        QuestionInfo[] calldata questionsInfo
+        bytes calldata initState
     ) public {
-        if (UNDERDOG_Parent.userHasAdminAccess(msg.sender) == false) {
-            revert("Sender is not an admin");
-        }
-
+        QuestionInfo[] memory questionsInfo = abi.decode(initState, (QuestionInfo[]));
         // Set the questions for the given raceId
         delete UNDERDOG_questions[raceId];  // Clear any existing questions
         for (uint256 i = 0; i < questionsInfo.length; i++) {
@@ -85,12 +73,8 @@ contract GAME_Underdog {
         uint8 questionIndex,
         uint8 answerIndex
     ) external {
-        UNDERDOG_Parent.validateRaceId(raceId);
-
         // Check if the player has already answered this question
-        if (UNDERDOG_usersAnswers[raceId][msg.sender][questionIndex] == true) {
-            revert AlreadyAnswered();
-        }
+        require(UNDERDOG_usersAnswers[raceId][msg.sender][questionIndex] == false, "Player has already answered this question");
 
         // Mark the question as answered and store the user's choice
         UNDERDOG_usersAnswers[raceId][msg.sender][questionIndex] = true;
@@ -103,8 +87,6 @@ contract GAME_Underdog {
     function distribute(
         uint256 raceId
     ) external {
-        UNDERDOG_Parent.validateRaceId(raceId);
-
         // Iterate through the questions in the mapping and distribute rewards
         for (uint8 questionIndex = 0; questionIndex < UNDERDOG_questions[raceId].length; questionIndex++) {
             _distributeRewardOfQuestion(raceId, questionIndex);
@@ -115,8 +97,6 @@ contract GAME_Underdog {
     function getRules(
         uint256 raceId
     ) public view returns (QuestionInfoReturnType[] memory) {
-        UNDERDOG_Parent.validateRaceId(raceId);
-
         uint256 length = UNDERDOG_questions[raceId].length;
 
         // Initialize an array to store QuestionInfoReturnType structs
@@ -144,9 +124,7 @@ contract GAME_Underdog {
         QuestionInfo[] storage questions = UNDERDOG_questions[raceId];
 
         // Ensure the question index is valid
-        if (questionIndex >= questions.length) {
-            revert("Invalid question index");
-        }
+        require(questionIndex < questions.length, "Invalid question index");
 
         // Get the players who answered and their choices
         address[] memory answeredPlayersList = UNDERDOG_answeredPlayers[raceId][questionIndex];

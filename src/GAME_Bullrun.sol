@@ -1,10 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
-import { BlockSheep } from "./BlockSheep.sol";
 
 contract GAME_Bullrun {
-    BlockSheep BULLRUN_Parent;
-
     // Struct to track user rooms
     struct BULLRUN_Room {
         uint256 userPerkIndex;
@@ -36,21 +33,15 @@ contract GAME_Bullrun {
 
     mapping(uint256 => mapping(address => mapping(address => bool))) private BULLRUN_opponentsPlayed;
 
-    
 
-    constructor(address blocksheepAddress) {
-        BULLRUN_Parent = BlockSheep(blocksheepAddress);
-    }
 
     // function to retrieve user points
     function getPoints(address user, uint256 raceId) public view returns (int256) {
-        BULLRUN_Parent.validateRaceId(raceId);
         return BULLRUN_usersChoices[raceId][user].points;
     }
 
     // function to retrieve user choices indexes
     function getUserChoices(uint256 raceId, address user) public view returns (uint256[] memory) {
-        BULLRUN_Parent.validateRaceId(raceId);
         return BULLRUN_usersChoices[raceId][user].selectedPerks;
     }
 
@@ -155,12 +146,11 @@ contract GAME_Bullrun {
         opponentRoom.distributed = true;
     }
 
-    function initRace(uint256 raceId, int256[3][3] calldata points) public {
-        if (BULLRUN_Parent.userHasAdminAccess(msg.sender) == false) {
-            revert("Sender is not an admin");
-        }
-
+    function initRace(uint256 raceId, bytes calldata initState) public {
+        int256[3][3] memory points = abi.decode(initState, (int256[3][3]));
+        
         require(points.length > 0, "Points matrix cannot be empty");
+
         for (uint256 i = 0; i < points.length; i++) {
             BULLRUN_pointsPerPerks[raceId][i] = new int256[](points[i].length);
             for (uint256 j = 0; j < points[i].length; j++) {
@@ -175,7 +165,6 @@ contract GAME_Bullrun {
         address user2,
         address user3
     ) {
-        BULLRUN_Parent.validateRaceId(raceId);
         int256 highest = type(int256).min;
         int256 secondHighest = type(int256).min;
         int256 thirdHighest = type(int256).min;
@@ -213,7 +202,6 @@ contract GAME_Bullrun {
     }
 
     function getRules(uint256 raceId) public view returns (int256[3][3] memory perksMatrix) {
-        BULLRUN_Parent.validateRaceId(raceId);
         for (uint256 i = 0; i < 3; i++) {
             for (uint256 j = 0; j < 3; j++) {
                 perksMatrix[i][j] = BULLRUN_pointsPerPerks[raceId][i][j];

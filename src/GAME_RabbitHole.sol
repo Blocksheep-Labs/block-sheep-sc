@@ -2,8 +2,6 @@
 pragma solidity ^0.8.20;
 
 contract GAME_RabbitHole {
-    address public BLOCKSHEEP_ADDR;
-    
     // user chioces by gameId
     //        raceId           roundId           user          fuelSubmitted
     mapping(uint256 => mapping(uint256 => mapping(address => uint256))) public RABBITHOLE_usersChoices;
@@ -21,12 +19,6 @@ contract GAME_RabbitHole {
     mapping(uint256 => mapping(uint256 => address)) public RABBITHOLE_eliminatedAtRound;
 
 
-    constructor(
-        address blocksheep
-    ) {
-        BLOCKSHEEP_ADDR = blocksheep;
-    }
-
     function getPoints(uint256 raceId) public view returns (uint256) {
         return RABBITHOLE_points[raceId][msg.sender];
     }
@@ -41,6 +33,8 @@ contract GAME_RabbitHole {
         uint256 fuelLeft,
         uint256 roundIndex
     ) external {
+        require(RABBITHOLE_roundWasParticipated[raceId][roundIndex][msg.sender] == false, "Already participated at round");
+
         // if was not participated at the round, mark as participated and store fuel data
         if (RABBITHOLE_roundWasParticipated[raceId][roundIndex][msg.sender] == false) {
             RABBITHOLE_roundParticipants[raceId][roundIndex].push(msg.sender);
@@ -77,6 +71,8 @@ contract GAME_RabbitHole {
     function distribute(
         uint256 raceId
     ) external {
+        require(RABBITHOLE_eliminatedAtRound[raceId][0] != address(0), "RaceId does not exist or no eliminations");
+
         uint256 roundIndex = 0;
 
         uint256[] memory points;
