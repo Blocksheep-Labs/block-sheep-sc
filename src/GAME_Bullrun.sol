@@ -1,7 +1,9 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
-contract GAME_Bullrun {
+import { IGameInterface } from "./IGameInterface.sol";
+
+contract GameBullrun is IGameInterface {
     // Struct to track user rooms
     struct BULLRUN_Room {
         uint256 userPerkIndex;
@@ -28,7 +30,7 @@ contract GAME_Bullrun {
     mapping(uint256 => mapping(uint256 => int256[])) public BULLRUN_pointsPerPerks;
 
     // Track users who have participated in each game
-    mapping(uint256 => address[]) public BULLRUN_gameParticipants;
+    mapping(uint256 => address[]) private BULLRUN_gameParticipants;
 
 
     mapping(uint256 => mapping(address => mapping(address => bool))) private BULLRUN_opponentsPlayed;
@@ -48,9 +50,9 @@ contract GAME_Bullrun {
 
     function makeMove(
         uint256 raceId,
-        uint256 perkIndex,
-        address opponentAddress
+        bytes memory data
     ) public {
+        (uint256 perkIndex, address opponentAddress) = abi.decode(data, (uint256, address));
         //PARENT_BLOCKSHEEP.validateGameCompletion(raceId, "rabbit-hole");
         require(perkIndex < 3, "Invalid perk index");
 
@@ -89,8 +91,10 @@ contract GAME_Bullrun {
 
     function distribute(
         uint256 raceId,
-        address opponentAddress
+        bytes memory data
     ) public {
+        (address opponentAddress) = abi.decode(data, (address));
+
         // Ensure the opponent is not the same as the caller
         require(msg.sender != opponentAddress, "Cannot play against yourself");
 
@@ -160,11 +164,7 @@ contract GAME_Bullrun {
     }
 
     // used to get 3 persons with maximum points
-    function getWinner(uint256 raceId) public view returns (
-        address user1,
-        address user2,
-        address user3
-    ) {
+    function getWinner(uint256 raceId) public view returns (address[] memory, int256[] memory) {
         int256 highest = type(int256).min;
         int256 secondHighest = type(int256).min;
         int256 thirdHighest = type(int256).min;
@@ -173,43 +173,56 @@ contract GAME_Bullrun {
         address secondHighestUser = address(0);
         address thirdHighestUser = address(0);
 
+        address[] memory users = new address[](3);
+        int256[] memory points;
+
         if (BULLRUN_gameParticipants[raceId].length > 0) {
             // loop through the participants
             for (uint256 i = 0; i < BULLRUN_gameParticipants[raceId].length; i++) {
                 address participant = BULLRUN_gameParticipants[raceId][i];
-                int256 points = getPoints(participant, raceId);
+                int256 USERpoints = getPoints(participant, raceId);
 
-                if (points > highest) {
+                if (USERpoints > highest) {
                     thirdHighest = secondHighest;
                     thirdHighestUser = secondHighestUser;
                     secondHighest = highest;
                     secondHighestUser = highestUser;
-                    highest = points;
+                    highest = USERpoints;
                     highestUser = participant;
-                } else if (points > secondHighest) {
+                } else if (USERpoints > secondHighest) {
                     thirdHighest = secondHighest;
                     thirdHighestUser = secondHighestUser;
-                    secondHighest = points;
+                    secondHighest = USERpoints;
                     secondHighestUser = participant;
-                } else if (points > thirdHighest) {
-                    thirdHighest = points;
+                } else if (USERpoints > thirdHighest) {
+                    thirdHighest = USERpoints;
                     thirdHighestUser = participant;
                 }
             }
         }
 
-        return (highestUser, secondHighestUser, thirdHighestUser);
+        users[0] = highestUser;
+        users[1] = secondHighestUser;
+        users[2] = thirdHighestUser;
+
+        points[0] = getPoints(highestUser, raceId);
+        points[1] = getPoints(secondHighestUser, raceId);
+        points[2] = getPoints(thirdHighestUser, raceId);
+
+        return (users, points);
     }
 
-    function getRules(uint256 raceId) public view returns (int256[3][3] memory perksMatrix) {
+    function getRules(uint256 raceId) public view returns (bytes memory) {
+        int256[3][3] memory perksMatrix;
         for (uint256 i = 0; i < 3; i++) {
             for (uint256 j = 0; j < 3; j++) {
                 perksMatrix[i][j] = BULLRUN_pointsPerPerks[raceId][i][j];
             }
         }
+
+        return abi.encode(perksMatrix);
     }
 
-    
     
     // Utility function to check if a user has already participated in a race
     function _isParticipant(uint256 raceId, address user) internal view returns (bool) {

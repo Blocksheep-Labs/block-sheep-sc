@@ -1,10 +1,13 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.0;
+pragma solidity ^0.8.20;
 
-contract GAME_Underdog {
+import { IGameInterface } from "./IGameInterface.sol";
+
+
+contract GameUnderdog is IGameInterface {
     // User choices by raceId, user address, and questionIndex
-    mapping(uint256 => mapping(address => mapping(uint8 => uint8))) private UNDERDOG_usersChoices;
+    mapping(uint256 => mapping(address => mapping(uint8 => uint256))) private UNDERDOG_usersChoices;
 
     // Track answer states (answered or not) for each question
     mapping(uint256 => mapping(address => mapping(uint8 => bool))) private UNDERDOG_usersAnswers;
@@ -13,7 +16,7 @@ contract GAME_Underdog {
     mapping(uint256 => QuestionInfo[]) private UNDERDOG_questions;
 
     // Users' points by raceId and address
-    mapping(uint256 => mapping(address => uint8)) private UNDERDOG_points;
+    mapping(uint256 => mapping(address => int256)) private UNDERDOG_points;
 
     // Track if points have been distributed for each question
     mapping(uint256 => mapping(uint8 => bool)) private UNDERDOG_pointsDistributed;
@@ -45,34 +48,58 @@ contract GAME_Underdog {
         }
     }
 
-    function getWinner(uint256 raceId) public pure returns (address) {
-        return address(0);
+    function getWinner(uint256 raceId) public view returns (address[] memory, int256[] memory) {
+        address[] memory players;
+        int256[] memory points;
+        uint256 index = 0;
+
+        // Loop through all questions to collect the addresses of the players who answered
+        for (uint8 qIndex = 0; qIndex < UNDERDOG_questions[raceId].length; qIndex++) {
+            address[] memory answeredPlayers = UNDERDOG_answeredPlayers[raceId][qIndex];
+
+            for (uint256 i = 0; i < answeredPlayers.length; i++) {
+                // Avoid duplicates by checking if the player is already in tempPlayers array
+                bool exists = false;
+                for (uint256 j = 0; j < players.length; j++) {
+                    if (players[j] == answeredPlayers[i]) {
+                        exists = true;
+                        break;
+                    }
+                }
+                if (!exists) {
+                    players[index] = answeredPlayers[i];
+                    points[index] = getPoints(answeredPlayers[i], raceId);
+                    index++;
+                }
+            }
+        }
+
+        return (players, points);
     }
 
-    function getPoints(uint256 raceId) public view returns (uint256) {
-        return UNDERDOG_points[raceId][msg.sender];
+    function getPoints(address user, uint256 raceId) public view returns (int256) {
+        return UNDERDOG_points[raceId][user];
     }
 
-    function getUserChoices(uint256 raceId) public view returns (uint8[] memory, uint8[] memory) {
+    function getUserChoices(uint256 raceId, address user) external view returns (uint256[] memory) {
         uint256 questionsCount = UNDERDOG_questions[raceId].length;
 
-        uint8[] memory questionIndexes = new uint8[](questionsCount);
-        uint8[] memory userChoices = new uint8[](questionsCount);
+        uint256[] memory userChoices = new uint256[](questionsCount);
 
         // Loop through each question index and fetch the user's choice
         for (uint8 i = 0; i < questionsCount; i++) {
-            questionIndexes[i] = i;
-            userChoices[i] = UNDERDOG_usersChoices[raceId][msg.sender][i];
+            userChoices[i] = UNDERDOG_usersChoices[raceId][user][i];
         }
 
-        return (questionIndexes, userChoices);
+        return userChoices;
     }
 
     function makeMove(
         uint256 raceId,
-        uint8 questionIndex,
-        uint8 answerIndex
+        bytes memory data
     ) external {
+        (uint8 questionIndex, uint8 answerIndex) = abi.decode(data, (uint8, uint8));
+        
         // Check if the player has already answered this question
         require(UNDERDOG_usersAnswers[raceId][msg.sender][questionIndex] == false, "Player has already answered this question");
 
@@ -85,7 +112,8 @@ contract GAME_Underdog {
     }
 
     function distribute(
-        uint256 raceId
+        uint256 raceId,
+        bytes memory
     ) external {
         // Iterate through the questions in the mapping and distribute rewards
         for (uint8 questionIndex = 0; questionIndex < UNDERDOG_questions[raceId].length; questionIndex++) {
@@ -96,7 +124,7 @@ contract GAME_Underdog {
 
     function getRules(
         uint256 raceId
-    ) public view returns (QuestionInfoReturnType[] memory) {
+    ) public view returns (bytes memory) {
         uint256 length = UNDERDOG_questions[raceId].length;
 
         // Initialize an array to store QuestionInfoReturnType structs
@@ -111,7 +139,7 @@ contract GAME_Underdog {
         }
 
         // Return the populated questionsInfo array
-        return questionsInfo;
+        return abi.encode(questionsInfo);
     }
 
 
@@ -133,7 +161,7 @@ contract GAME_Underdog {
         // Count the answers for each choice
         uint256[] memory answerCounts = new uint256[](questions[questionIndex].answers.length);
         for (uint256 i = 0; i < totalPlayers; i++) {
-            uint8 playerAnswer = UNDERDOG_usersChoices[raceId][answeredPlayersList[i]][questionIndex];
+            uint256 playerAnswer = UNDERDOG_usersChoices[raceId][answeredPlayersList[i]][questionIndex];
             answerCounts[playerAnswer]++;
         }
 
