@@ -32,12 +32,16 @@ contract GameRabbitHole is IGameInterface {
 
     function getUserChoices(uint256 raceId, address user) public view returns (uint256[] memory) {
         uint256 roundIndex = 0;
-        uint256[] memory fuelSubmissions;
 
         // determine the maximum possible round index
         while (RABBITHOLE_eliminatedAtRound[raceId][roundIndex] != address(0)) {
-            fuelSubmissions[roundIndex] = RABBITHOLE_usersChoices[raceId][roundIndex][user];
             roundIndex++;
+        }
+
+        uint256[] memory fuelSubmissions = new uint256[](roundIndex);
+
+        for (uint256 i = 0; i < roundIndex; i++) {
+            fuelSubmissions[i] = RABBITHOLE_usersChoices[raceId][i][user];
         }
 
         return fuelSubmissions;
@@ -45,7 +49,7 @@ contract GameRabbitHole is IGameInterface {
 
     function getWinner(uint256 raceId) external view returns (address[] memory, int256[] memory) {
         require(RABBITHOLE_distributed[raceId], "Not distributed yet");
-        int256[] memory points;
+        int256[] memory points = new int256[](RABBITHOLE_winners[raceId].length);
 
         for (uint256 i = 0; i < RABBITHOLE_winners[raceId].length; i++) {
             points[i] = getPoints(RABBITHOLE_winners[raceId][i], raceId);
@@ -108,12 +112,12 @@ contract GameRabbitHole is IGameInterface {
 
         uint256 roundIndex = 0;
 
-        int256[] memory points;
+        int256[] memory points = new int256[](3);
         points[0] = 3; // First place
         points[1] = 2; // Second place
         points[2] = 1; // Third place
 
-        address[] memory topParticipants;
+        address[] memory topParticipants = new address[](3);
 
         // determine the maximum possible round index
         while (RABBITHOLE_eliminatedAtRound[raceId][roundIndex] != address(0)) {
@@ -148,6 +152,8 @@ contract GameRabbitHole is IGameInterface {
                 RABBITHOLE_winners[raceId].push(topParticipants[i]);
             }
         }
+        // set game as distributed
+        RABBITHOLE_distributed[raceId] = true;
     }
 
     function getRules(uint256 raceId) external pure returns (bytes memory) {

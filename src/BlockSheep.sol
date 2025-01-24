@@ -26,6 +26,7 @@ contract BlockSheep is Ownable {
     mapping(string => address) public targetContracts;
 
 
+
     enum RaceStatus {
         NON_EXIST,
         CREATED,
@@ -41,16 +42,18 @@ contract BlockSheep is Ownable {
         mapping(address => bool) refunded;
         address[] registeredUsers;
         uint8 numOfPlayersRequired;
+        string[] screens;
     }
 
     struct RaceInfo {
-        uint256 id;
-        uint64 startAt;
-        bool registered;
-        RaceStatus status;
         bool refunded;
-        address[] registeredUsers;
+        bool registered;
         uint8 numOfPlayersRequired;
+        uint64 startAt;
+        uint256 id;
+        string[] screens;
+        address[] registeredUsers;
+        RaceStatus status;
     }
 
     event Registered(address user, uint256 amount);
@@ -135,6 +138,7 @@ contract BlockSheep is Ownable {
     function addRace(
         uint64 hoursBeforeFinish,
         uint8 numOfPlayersRequired,
+        string[] memory screens,
         bytes calldata initStateForBullrun, //int256[3][3] calldata points,
         bytes calldata initStateForUnderdog //QuestionInfo[] calldata questions
     ) external {
@@ -147,6 +151,7 @@ contract BlockSheep is Ownable {
         _race.id = nextRaceId;
         _race.numOfPlayersRequired = numOfPlayersRequired;
         _race.startAt = startAt;
+        _race.screens = screens;
 
         // init underdog
         bytes memory underdogData = abi.encodeWithSelector(
@@ -198,14 +203,33 @@ contract BlockSheep is Ownable {
         raceInfo.numOfPlayersRequired = race.numOfPlayersRequired;
 
         raceInfo.status = getRaceStatus(id);
+
+        raceInfo.screens = race.screens;
     }
 
 
     function getScoreAtRaceOfUser(
         uint256 raceId, 
         address user
-    ) external view returns (uint256) {
-        
+    ) external returns (int256) {
+        int256 score = 0;
+
+        bytes memory getPointsData = abi.encodeWithSelector(
+            bytes4(keccak256("getPoints(address user, uint256 raceId)")),
+            user,
+            raceId
+        );
+
+        bytes memory underdogPoints = callFunctionAtRegisteredContract("UNDERDOG", getPointsData);
+        score += abi.decode(underdogPoints, (int256));
+
+        bytes memory rabbitholePoints = callFunctionAtRegisteredContract("RABBITHOLE", getPointsData);
+        score += abi.decode(rabbitholePoints, (int256));
+
+        bytes memory bullrunPoints = callFunctionAtRegisteredContract("BULLRUN", getPointsData);
+        score += abi.decode(bullrunPoints, (int256));
+
+        return score;
     }
 
     function getRacesWithPagination(
@@ -237,6 +261,8 @@ contract BlockSheep is Ownable {
             _races[index].numOfPlayersRequired = race.numOfPlayersRequired;
 
             _races[index].status = getRaceStatus(race.id);
+
+            _races[index].screens = race.screens;
         }
 
         return _races;

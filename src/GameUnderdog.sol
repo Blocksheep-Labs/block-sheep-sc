@@ -165,6 +165,7 @@ contract GameUnderdog is IGameInterface {
             answerCounts[playerAnswer]++;
         }
 
+        
         // If it's a draw, skip reward distribution
         bool isDraw = true; // draw initially
         uint256 firstCount = answerCounts[0]; // Get the first count to compare against
@@ -179,9 +180,10 @@ contract GameUnderdog is IGameInterface {
         if (isDraw) {
             return; // Skip reward distribution if it's a draw
         }
+        
 
-        // Determine the winning answer ID (answer with the most players)
-        uint8 winningAnswerId = _getWinningAnswerId(answerCounts);
+        // Determine the winning answer ID (answer with the smallest number of players)
+        uint8 winningAnswerId = _getWinningAnswerIdWithSmallestCount(answerCounts);
 
         // Distribute points for the winning answer
         for (uint256 i = 0; i < totalPlayers; i++) {
@@ -197,14 +199,15 @@ contract GameUnderdog is IGameInterface {
         UNDERDOG_pointsDistributed[raceId][questionIndex] = true;
     }
 
-    function _getWinningAnswerId(uint256[] memory answerCounts) internal pure returns (uint8) {
+    // Helper function to get the winning answer ID with the smallest count
+    function _getWinningAnswerIdWithSmallestCount(uint256[] memory answerCounts) internal pure returns (uint8) {
+        uint256 smallestCount = type(uint256).max; // Start with the maximum possible value
         uint8 winningAnswerId = 0;
-        uint256 maxCount = 0;
 
         for (uint8 i = 0; i < answerCounts.length; i++) {
-            if (answerCounts[i] > maxCount) {
-                maxCount = answerCounts[i];
-                winningAnswerId = i;
+            if (answerCounts[i] < smallestCount) {
+                smallestCount = answerCounts[i];
+                winningAnswerId = i; // Update winning answer ID
             }
         }
 

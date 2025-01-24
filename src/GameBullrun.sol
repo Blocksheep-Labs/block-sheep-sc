@@ -174,7 +174,7 @@ contract GameBullrun is IGameInterface {
         address thirdHighestUser = address(0);
 
         address[] memory users = new address[](3);
-        int256[] memory points;
+        int256[] memory points = new int256[](3);
 
         if (BULLRUN_gameParticipants[raceId].length > 0) {
             // loop through the participants
