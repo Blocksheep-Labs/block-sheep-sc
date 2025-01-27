@@ -1,7 +1,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {GameRabbitHole} from"../../src/GameRabbitHole.sol"; // Adjust the path as necessary
+import {GameRabbitHole} from "../../src/GameRabbitHole.sol";
 
 contract GameRabbitHoleTest is Test {
     GameRabbitHole game;
@@ -72,7 +72,7 @@ contract GameRabbitHoleTest is Test {
         assertEq(choices[0], 100);
     }
 
-    function testGetRules() public {
+    function testGetRules() public view {
         // Check rules for a race
         bytes memory rules = game.getRules(raceId);
         assertEq(abi.decode(rules, (uint256)), raceId);

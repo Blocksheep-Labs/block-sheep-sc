@@ -28,7 +28,7 @@ contract GameBullrunTest is Test {
         game.initRace(raceId, abi.encode(points));
     }
 
-    function testInitRace() public {
+    function testInitRace() public view {
         // Test if the rules were properly set
         bytes memory rules = game.getRules(raceId);
         int256[3][3] memory decodedRules = abi.decode(rules, (int256[3][3]));

@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import { Test } from "forge-std/Test.sol";
-import { GameUnderdog } from "../../src/GameUnderdog.sol"; // Adjust the path as necessary
+import { GameUnderdog } from "../../src/GameUnderdog.sol";
 
 contract GameUnderdogTest is Test {
     GameUnderdog game;
@@ -98,7 +98,7 @@ contract GameUnderdogTest is Test {
         assertEq(points3, 0); // Player 3 should get 0 points
     }
 
-    function testGetRules() public {
+    function testGetRules() public view {
         // Check rules for a race
         bytes memory rules = game.getRules(raceId);
         GameUnderdog.QuestionInfoReturnType[] memory questionsInfo = abi.decode(rules, (GameUnderdog.QuestionInfoReturnType[]));
