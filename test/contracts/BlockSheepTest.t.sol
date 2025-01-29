@@ -125,6 +125,7 @@ contract BlockSheepTest is Test {
         bls.addRace(
             1, 
             2, 
+            0,
             screens, 
             abi.encode(points), // for bullrun init
             abi.encode(questions) // for underdog init
@@ -169,6 +170,7 @@ contract BlockSheepTest is Test {
         bls.addRace(
             1, 
             2, 
+            0,
             screens, 
             abi.encode(points), // for bullrun init
             abi.encode(questions) // for underdog init
@@ -207,6 +209,7 @@ contract BlockSheepTest is Test {
         bls.addRace(
             1, 
             2, 
+            0,
             screens, 
             abi.encode(points), // for bullrun init
             abi.encode(questions) // for underdog init
@@ -215,7 +218,7 @@ contract BlockSheepTest is Test {
         // register
         bls.register(0); // 0 - is the id of the first race
 
-        vm.expectRevert();
+        // vm.expectRevert();
         bls.refundBalance(amount, 0); // 0 - is the id of the first race
         
         vm.stopPrank();

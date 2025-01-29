@@ -25,8 +25,6 @@ contract BlockSheep is Ownable {
 
     mapping(string => address) public targetContracts;
 
-
-
     enum RaceStatus {
         NON_EXIST,
         CREATED,
@@ -36,18 +34,20 @@ contract BlockSheep is Ownable {
     }
 
     struct Race {
-        uint256 id;
+        uint8 storyKey;
+        uint8 numOfPlayersRequired;
         uint64 endAt;
+        uint256 id;
         mapping(address => bool) playerRegistered;
         mapping(address => bool) refunded;
-        address[] registeredUsers;
-        uint8 numOfPlayersRequired;
         string[] screens;
+        address[] registeredUsers;
     }
 
     struct RaceInfo {
         bool refunded;
         bool registered;
+        uint8 storyKey;
         uint8 numOfPlayersRequired;
         uint64 endAt;
         uint256 id;
@@ -140,6 +140,7 @@ contract BlockSheep is Ownable {
     function addRace(
         uint64 hoursBeforeFinish,
         uint8 numOfPlayersRequired,
+        uint8 storyKey,
         string[] memory screens,
         bytes calldata initStateForBullrun, //int256[3][3] calldata points,
         bytes calldata initStateForUnderdog //QuestionInfo[] calldata questions
@@ -154,25 +155,32 @@ contract BlockSheep is Ownable {
         _race.numOfPlayersRequired = numOfPlayersRequired;
         _race.endAt = endAt;
         _race.screens = screens;
+        _race.storyKey = storyKey;
 
-        // init underdog
-        bytes memory underdogData = abi.encodeWithSelector(
-            bytes4(keccak256("initRace(uint256,bytes)")),
-            nextRaceId,
-            initStateForUnderdog
-        );
-        callFunctionAtRegisteredContract("UNDERDOG", underdogData);
+        for (uint256 i = 0; i < screens.length; i++) {
+            // init underdog
+            if (keccak256(bytes(screens[i])) == keccak256(bytes("UNDERDOG"))) {
+                bytes memory underdogData = abi.encodeWithSelector(
+                    bytes4(keccak256("initRace(uint256,bytes)")),
+                    nextRaceId,
+                    initStateForUnderdog
+                );
+                callFunctionAtRegisteredContract("UNDERDOG", underdogData);
+            }
 
-        // init bullrun
-        bytes memory bullrunData = abi.encodeWithSelector(
-            bytes4(keccak256("initRace(uint256,bytes)")),
-            nextRaceId,
-            initStateForBullrun
-        );
-        callFunctionAtRegisteredContract("BULLRUN", bullrunData);
+            // init bullrun
+            if (keccak256(bytes(screens[i])) == keccak256(bytes("BULLRUN"))) {
+                bytes memory bullrunData = abi.encodeWithSelector(
+                    bytes4(keccak256("initRace(uint256,bytes)")),
+                    nextRaceId,
+                    initStateForBullrun
+                );
+                callFunctionAtRegisteredContract("BULLRUN", bullrunData);
+            }
 
-        // init rabbithole
-        // RABBITHOLE DOES NOT REQUIRE TO CALL THE initRace FUNCTION
+            // init rabbithole
+            // RABBITHOLE DOES NOT REQUIRE TO CALL THE initRace FUNCTION
+        }
 
         nextRaceId++;
     }
@@ -207,6 +215,8 @@ contract BlockSheep is Ownable {
         raceInfo.status = getRaceStatus(id);
 
         raceInfo.screens = race.screens;
+
+        raceInfo.storyKey = race.storyKey;
     }
 
 
@@ -265,6 +275,8 @@ contract BlockSheep is Ownable {
             _races[index].status = getRaceStatus(race.id);
 
             _races[index].screens = race.screens;
+
+            _races[index].storyKey = race.storyKey;
         }
 
         return _races;
