@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { IGameInterface } from "./IGameInterface.sol";
 
 
 contract BlockSheep is Ownable {
@@ -122,20 +123,6 @@ contract BlockSheep is Ownable {
         targetContracts[name] = contractAddress;
     }
 
-
-    function callFunctionAtRegisteredContract (
-        string memory contractName,
-        bytes memory data
-    ) public returns (bytes memory) {
-        address target = targetContracts[contractName];
-        require(target != address(0), "Target was not found");
-
-        (bool success, bytes memory returnData) = target.call(data);
-        require(success, "Call failed");
-
-        return returnData;
-    }
-
     /// Admin functions
     function addRace(
         uint64 hoursBeforeFinish,
@@ -160,22 +147,12 @@ contract BlockSheep is Ownable {
         for (uint256 i = 0; i < screens.length; i++) {
             // init underdog
             if (keccak256(bytes(screens[i])) == keccak256(bytes("UNDERDOG"))) {
-                bytes memory underdogData = abi.encodeWithSelector(
-                    bytes4(keccak256("initRace(uint256,bytes)")),
-                    nextRaceId,
-                    initStateForUnderdog
-                );
-                callFunctionAtRegisteredContract("UNDERDOG", underdogData);
+                initRace("UNDERDOG", nextRaceId, initStateForUnderdog);
             }
 
             // init bullrun
             if (keccak256(bytes(screens[i])) == keccak256(bytes("BULLRUN"))) {
-                bytes memory bullrunData = abi.encodeWithSelector(
-                    bytes4(keccak256("initRace(uint256,bytes)")),
-                    nextRaceId,
-                    initStateForBullrun
-                );
-                callFunctionAtRegisteredContract("BULLRUN", bullrunData);
+                initRace("BULLRUN", nextRaceId, initStateForBullrun);
             }
 
             // init rabbithole
@@ -223,23 +200,14 @@ contract BlockSheep is Ownable {
     function getScoreAtRaceOfUser(
         uint256 raceId, 
         address user
-    ) external returns (int256) {
+    ) external view returns (int256) {
         int256 score = 0;
 
-        bytes memory getPointsData = abi.encodeWithSelector(
-            bytes4(keccak256("getPoints(address user, uint256 raceId)")),
-            user,
-            raceId
-        );
+        score += getPoints("UNDERDOG", user, raceId);
 
-        bytes memory underdogPoints = callFunctionAtRegisteredContract("UNDERDOG", getPointsData);
-        score += abi.decode(underdogPoints, (int256));
+        score += getPoints("RABBITHOLE", user, raceId);
 
-        bytes memory rabbitholePoints = callFunctionAtRegisteredContract("RABBITHOLE", getPointsData);
-        score += abi.decode(rabbitholePoints, (int256));
-
-        bytes memory bullrunPoints = callFunctionAtRegisteredContract("BULLRUN", getPointsData);
-        score += abi.decode(bullrunPoints, (int256));
+        score += getPoints("BULLRUN", user, raceId);
 
         return score;
     }
@@ -285,5 +253,35 @@ contract BlockSheep is Ownable {
     // Function to check if a player is registered for a specific race
     function isPlayerRegistered(uint256 raceId, address player) public view returns (bool) {
         return races[raceId].playerRegistered[player];
+    }
+
+
+
+    function getPoints(string memory gameName, address user, uint256 raceId) public view returns (int256) {
+        return IGameInterface(targetContracts[gameName]).getPoints(user, raceId);
+    }
+
+    function getUserChoices(string memory gameName, uint256 raceId, address user) public view returns (uint256[] memory) {
+        return IGameInterface(targetContracts[gameName]).getUserChoices(raceId, user);
+    }
+
+    function getWinner(string memory gameName, uint256 raceId) public view returns (address[] memory, int256[] memory) {
+        return IGameInterface(targetContracts[gameName]).getWinner(raceId);
+    }
+
+    function getRules(string memory gameName, uint256 raceId) public view returns (bytes memory) {
+        return IGameInterface(targetContracts[gameName]).getRules(raceId);
+    }
+
+    function makeMove(string memory gameName, uint256 raceId, bytes memory data) public {
+        IGameInterface(targetContracts[gameName]).makeMove(raceId, data);
+    }
+
+    function distribute(string memory gameName, uint256 raceId, bytes memory data) public {
+        IGameInterface(targetContracts[gameName]).distribute(raceId, data);
+    }
+
+    function initRace(string memory gameName, uint256 raceid, bytes memory data) public {
+        IGameInterface(targetContracts[gameName]).initRace(raceid, data);
     }
 }
