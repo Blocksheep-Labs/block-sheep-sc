@@ -38,7 +38,7 @@ contract GameUnderdog is IGameInterface {
 
     function initRace(
         uint256 raceId,
-        bytes calldata initState
+        bytes memory initState
     ) public {
         QuestionInfo[] memory questionsInfo = abi.decode(initState, (QuestionInfo[]));
         // Set the questions for the given raceId

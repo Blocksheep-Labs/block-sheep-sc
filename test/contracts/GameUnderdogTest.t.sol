@@ -14,8 +14,11 @@ contract GameUnderdogTest is Test {
 
     function setUp() public {
         game = new GameUnderdog();
+        
+        // Create a temporary memory array
         GameUnderdog.QuestionInfo[] memory questions = new GameUnderdog.QuestionInfo[](2);
 
+        // Populate the memory array
         questions[0].content = "Question content 1";
         questions[0].answers = new string[](2);
         questions[0].answers[0] = "Answer 1"; 
@@ -28,6 +31,7 @@ contract GameUnderdogTest is Test {
         questions[1].answers[1] = "Answer 2";
         questions[1].imgUrl = "url2";
 
+        // Encode the questions array before passing it to initRace
         game.initRace(raceId, abi.encode(questions));
 
         assertEq(questions.length, 2);

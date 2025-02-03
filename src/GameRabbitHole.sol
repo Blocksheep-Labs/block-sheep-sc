@@ -20,8 +20,8 @@ contract GameRabbitHole is IGameInterface {
     //        raceId           roundId     user
     mapping(uint256 => mapping(uint256 => address)) private RABBITHOLE_eliminatedAtRound;
 
-    // track the distribution of the races
-    mapping(uint256 => bool) private RABBITHOLE_distributed;
+    // track the distribution of the races by user
+    mapping(uint256 => mapping(address => bool)) private RABBITHOLE_distributed;
 
     mapping(uint256 => address[]) private RABBITHOLE_winners;
 
@@ -48,7 +48,7 @@ contract GameRabbitHole is IGameInterface {
     }
 
     function getWinner(uint256 raceId) external view returns (address[] memory, int256[] memory) {
-        require(RABBITHOLE_distributed[raceId], "Not distributed yet");
+        require(RABBITHOLE_distributed[raceId][msg.sender], "Not distributed yet");
         int256[] memory points = new int256[](RABBITHOLE_winners[raceId].length);
 
         for (uint256 i = 0; i < RABBITHOLE_winners[raceId].length; i++) {
@@ -108,7 +108,7 @@ contract GameRabbitHole is IGameInterface {
         bytes memory
     ) external {
         require(RABBITHOLE_eliminatedAtRound[raceId][0] != address(0), "RaceId does not exist or no eliminations");
-        require(RABBITHOLE_distributed[raceId] == false, "Already distributed");
+        require(RABBITHOLE_distributed[raceId][msg.sender] == false, "Already distributed");
 
         uint256 roundIndex = 0;
 
@@ -153,7 +153,7 @@ contract GameRabbitHole is IGameInterface {
             }
         }
         // set game as distributed
-        RABBITHOLE_distributed[raceId] = true;
+        RABBITHOLE_distributed[raceId][msg.sender] = true;
     }
 
     function getRules(uint256 raceId) external pure returns (bytes memory) {
