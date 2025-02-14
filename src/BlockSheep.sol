@@ -95,6 +95,47 @@ contract BlockSheep is Ownable {
         race.refunded[msg.sender] = true;
     }
 
+    function refundWinningBalance(uint256 raceId) external {
+        Race storage race = races[raceId];
+        require(race.endAt < block.timestamp, "Race is not finished");
+        require(race.playerRegistered[msg.sender], "Not registered");
+        require(!race.refunded[msg.sender], "Already refunded");
+
+        RaceInfo memory raceInfoById = getRace(raceId, msg.sender);
+        
+        uint256 userCount = raceInfoById.registeredUsers.length;
+        require(userCount > 0, "No users in race");
+
+        address[] memory users = new address[](userCount);
+        int256[] memory points = new int256[](userCount);
+        
+        // Fill users and points arrays
+        for (uint256 i = 0; i < userCount; i++) {
+            users[i] = raceInfoById.registeredUsers[i];
+            points[i] = getScoreAtRaceOfUser(raceId, users[i]);
+        }
+
+        // Determine msg.sender's position in the race
+        uint256 position = userCount;
+        for (uint256 i = 0; i < userCount; i++) {
+            if (users[i] == msg.sender) {
+                position = i;
+                break;
+            }
+        }
+
+        require(position < userCount, "User not found in race");
+
+        // Calculate bonus based on position (example: higher rank gets more bonus)
+        uint256 bonus = (userCount - position) * 10**18;
+
+        uint256 amount = COST + bonus;
+
+        balances[msg.sender] += amount;
+        race.refunded[msg.sender] = true;
+    }
+
+
     function register(uint256 raceId) external {
         Race storage race = races[raceId];
         require(raceId < nextRaceId, "Invalid race ID");
@@ -200,7 +241,7 @@ contract BlockSheep is Ownable {
     function getScoreAtRaceOfUser(
         uint256 raceId, 
         address user
-    ) external view returns (int256) {
+    ) public view returns (int256) {
         int256 score = 0;
 
         score += getPoints("UNDERDOG", user, raceId);
