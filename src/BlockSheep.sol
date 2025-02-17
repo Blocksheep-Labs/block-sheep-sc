@@ -4,71 +4,27 @@ pragma solidity ^0.8.20;
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import { GAME_Bullrun } from "./GAME_Bullrun.sol";
+import { IGameInterface } from "./IGameInterface.sol";
 
-contract BlockSheep is Ownable, GAME_Bullrun {
+
+contract BlockSheep is Ownable {
     using SafeERC20 for IERC20;
 
-    uint8 private constant NUM_OF_PLAYERS_PER_RACE = 3;
     uint64 private constant MIN_SECONDS_BEFORE_START_RACE = 5 minutes;
-    uint64 private constant GAME_DURATION = 5 * 60;
 
     IERC20 public immutable UNDERLYING;
     uint256 public immutable COST;
 
     mapping(address => uint256) public balances;
 
-    // questionId => question
-    mapping(uint256 => QuestionInfo) public questions;
-
-    uint256 private nextQuestionId;
-
-    // gameNameId => game name
-    mapping(uint256 => string) private gameNames;
-
-    uint256 private nextGameNameId;
-
-    mapping(uint256 => Race) private races;
+    mapping(uint256 => Race) public races;
 
     uint256 public nextRaceId;
 
     // list of admin access
     mapping(address => bool) public userHasAdminAccess;
 
-    struct QuestionInfo {
-        string content;
-        string[] answers;
-        string imgUrl;
-    }
-
-    struct QuestionInfoReturnType {
-        uint256 id;
-        QuestionInfo info;
-    }
-
-    struct Question {
-        uint256 questionId;
-        bool draw;
-        bool distributed;
-        uint8 answeredPlayersCount;
-        // answerId => count;
-        mapping(uint8 => address[]) playersByAnswer;
-        mapping(address => bool) answered;
-    }
-
-    struct Game {
-        uint256 gameId;
-        uint64 endAt;
-        uint8 numOfQuestions;
-        // questionIndex => Question
-        mapping(uint8 => Question) questions;
-        mapping(address => uint256) scoreByAddress;
-    }
-
-    struct GameParams {
-        uint256 gameId;
-        uint256[] questionIds;
-    }
+    mapping(string => address) public targetContracts;
 
     enum RaceStatus {
         NON_EXIST,
@@ -78,62 +34,28 @@ contract BlockSheep is Ownable, GAME_Bullrun {
         DISRIBUTTED
     }
 
-    struct RabbitTunnel {
-        address[] usersAddresses;
-        uint256[] fuelSubmissions;
-        uint256[] fuelLeft;
-        address[] finishedBy;
-        address winner;
-        
-        address[] pointsAddresses;
-        uint256[] pointsAmount;
-    }
-
     struct Race {
-        string name;
-        uint64 startAt;
-        uint8 numOfGames;
-        uint8 numOfQuestions;
-        mapping(uint256 => Game) games;
-        mapping(address => bool) playerRegistered;
-        mapping(address => uint256[]) gamesCompleted;
-        mapping(address => bool) refunded;
-        address[] registeredUsers;
-        RabbitTunnel rabbitTunnel;
+        uint8 storyKey;
         uint8 numOfPlayersRequired;
-        GAME_Bullrun BULLRUN;
+        uint64 endAt;
+        uint256 id;
+        mapping(address => bool) playerRegistered;
+        mapping(address => bool) refunded;
+        string[] screens;
+        address[] registeredUsers;
     }
 
     struct RaceInfo {
-        string name;
-        uint64 startAt;
-        uint8 numOfGames;
-        uint8 numOfQuestions;
-        bool registered;
-        RaceStatus status;
-        uint256[] games;
-        uint256[] gamesCompletedPerUser;
-        uint256 raceDuration;
         bool refunded;
-        address[] registeredUsers;
-        RabbitTunnel rabbitTunnel;
+        bool registered;
+        uint8 storyKey;
         uint8 numOfPlayersRequired;
+        uint64 endAt;
+        uint256 id;
+        string[] screens;
+        address[] registeredUsers;
+        RaceStatus status;
     }
-
-
-    error InvalidTimestamp();
-    error EmptyQuestions();
-    error InvalidRaceId();
-    error InvalidGameIndex();
-    error LengthMismatch();
-    error Timeout();
-    error AlreadyAnswered();
-    error AlreadyDistributed();
-    error AlreadyRegistered();
-    error RaceIsFull();
-    error NotRegistered();
-    error AccessDenied();
-    error GameIsNotComplted();
 
     event Registered(address user, uint256 amount);
 
@@ -141,22 +63,22 @@ contract BlockSheep is Ownable, GAME_Bullrun {
         address _underlying,
         address owner,
         uint256 _cost
-    ) Ownable(owner) GAME_Bullrun(address(this)) {
+    ) Ownable(owner) {
         UNDERLYING = IERC20(_underlying);
         COST = _cost;
         userHasAdminAccess[owner] = true;
     }
 
     function deposit(uint256 amount) external {
-        if (amount <= 0) revert("Amount to buy must be greater than zero");
+        require(amount > 0, "Amount to buy must be greater than zero");
 
         UNDERLYING.safeTransferFrom(msg.sender, address(this), amount);
         balances[msg.sender] += amount;
     }
 
     function withdraw(uint256 amount) external {
-        if (amount == 0) revert("Amount must be greater than zero");
-        if (balances[msg.sender] < amount) revert("Insufficient balance");
+        require(amount > 0, "Amount must be greater than zero");
+        require(balances[msg.sender] >= amount, "Insufficient balance");
         
         balances[msg.sender] -= amount;
         UNDERLYING.safeTransfer(msg.sender, amount);
@@ -164,358 +86,171 @@ contract BlockSheep is Ownable, GAME_Bullrun {
 
     function refundBalance(uint256 amount, uint256 raceId) external {
         Race storage race = races[raceId];
-        if (race.startAt > block.timestamp) revert InvalidTimestamp();
-        if (race.playerRegistered[msg.sender] == false) revert NotRegistered();
+        require(race.endAt < block.timestamp, "Race is not finished");
+        require(race.playerRegistered[msg.sender] == true, "Not registered");
+        require(race.refunded[msg.sender] == false, "Already refunded");
+
 
         balances[msg.sender] += amount;
         race.refunded[msg.sender] = true;
     }
 
+    function refundWinningBalance(uint256 raceId) external {
+        Race storage race = races[raceId];
+        require(race.endAt < block.timestamp, "Race is not finished");
+        require(race.playerRegistered[msg.sender], "Not registered");
+        require(!race.refunded[msg.sender], "Already refunded");
+
+        RaceInfo memory raceInfoById = getRace(raceId, msg.sender);
+        
+        uint256 userCount = raceInfoById.registeredUsers.length;
+        require(userCount > 0, "No users in race");
+
+        address[] memory users = new address[](userCount);
+        int256[] memory points = new int256[](userCount);
+        
+        // Fill users and points arrays
+        for (uint256 i = 0; i < userCount; i++) {
+            users[i] = raceInfoById.registeredUsers[i];
+            points[i] = getScoreAtRaceOfUser(raceId, users[i]);
+        }
+
+        // Determine msg.sender's position in the race
+        uint256 position = userCount;
+        for (uint256 i = 0; i < userCount; i++) {
+            if (users[i] == msg.sender) {
+                position = i;
+                break;
+            }
+        }
+
+        require(position < userCount, "User not found in race");
+
+        // Calculate bonus based on position (example: higher rank gets more bonus)
+        uint256 bonus = (userCount - position) * 10**18;
+
+        uint256 amount = COST + bonus;
+
+        balances[msg.sender] += amount;
+        race.refunded[msg.sender] = true;
+    }
+
+
     function register(uint256 raceId) external {
         Race storage race = races[raceId];
-        if (raceId >= nextRaceId) revert InvalidRaceId();
-        if (block.timestamp > race.startAt) revert InvalidTimestamp();
-        if (race.playerRegistered[msg.sender]) revert AlreadyRegistered();
-        if (race.registeredUsers.length >= race.numOfPlayersRequired) revert RaceIsFull();
+        require(raceId < nextRaceId, "Invalid race ID");
+        require(block.timestamp < race.endAt, "Race is not finished");
+        require(race.playerRegistered[msg.sender] == false, "Already registered");
+        require(race.registeredUsers.length < race.numOfPlayersRequired, "Race is full");
+        require(balances[msg.sender] >= COST, "Not enough balance");
         
-        balances[msg.sender] -= race.numOfQuestions * COST;
+        balances[msg.sender] -= COST;
         race.playerRegistered[msg.sender] = true;
         race.registeredUsers.push(msg.sender);
 
-        emit Registered(msg.sender, race.numOfQuestions * COST);
+        emit Registered(msg.sender, COST);
     }
 
     function setAdminRights(address user, bool isAdmin) external onlyOwner {
         userHasAdminAccess[user] = isAdmin;
     }
 
-    function submitAnswer(
-        uint256 raceId,
-        uint8 gameIndex,
-        uint8 qIndex,
-        uint8 aId
-    ) external {
-        validateRaceId(raceId);
-        validateGameIndex(raceId, gameIndex);
-        Game storage game = races[raceId].games[gameIndex];
-        Question storage question = game.questions[qIndex];
-        if (block.timestamp > game.endAt) revert Timeout();
-        if (question.answered[msg.sender]) revert AlreadyAnswered();
-        question.answered[msg.sender] = true;
-        question.answeredPlayersCount++;
-        question.playersByAnswer[aId].push(msg.sender);
-    }
-
-    
-    function submitFuel(
-        uint256 raceId,
-        uint256 fuelSubmision,
-        uint256 fuelLeft
-    ) external {
-        validateRaceId(raceId);
-        RabbitTunnel storage rabbitTunnel = races[raceId].rabbitTunnel;
-
-        rabbitTunnel.usersAddresses.push(msg.sender);
-        rabbitTunnel.fuelSubmissions.push(fuelSubmision);
-        rabbitTunnel.fuelLeft.push(fuelLeft);
-    }
-
-    function finishTunnelGame(
-        uint256 raceId,
-        bool isWon,
-        uint256 pointsToAllocate
-    ) external {
-        validateRaceId(raceId);
-        RabbitTunnel storage rabbitTunnel = races[raceId].rabbitTunnel;
-        rabbitTunnel.pointsAddresses.push(msg.sender);
-        rabbitTunnel.pointsAmount.push(pointsToAllocate);
-
-        rabbitTunnel.finishedBy.push(msg.sender);
-        if (isWon) {
-            rabbitTunnel.winner = msg.sender;
-        }
-    }
-
-    function distributeReward(
-        uint256 raceId,
-        uint8 gameIndex,
-        uint8[] calldata qIndexes,
-        bool isDraw,
-        address distributer
-    ) external {
-        validateRaceId(raceId);
-        validateGameIndex(raceId, gameIndex);
-        Race storage race = races[raceId];
-
-        if (isDraw == false) {
-            Game storage game = race.games[gameIndex];
-            for (uint8 i = 0; i < qIndexes.length; i++) {
-                _distributeRewardOfQuestion(game, qIndexes[i], distributer);
-            }
-        }
-
-        if (race.gamesCompleted[distributer].length == 0) {
-            race.gamesCompleted[distributer] = new uint256[](0);
-        }
-        
-        race.gamesCompleted[distributer].push(gameIndex);
-    }
-
-    function _distributeRewardOfQuestion(
-        Game storage game,
-        uint8 questionIndex,
-        address actualSender
-    ) internal {
-        Question storage question = game.questions[questionIndex];
-        uint8 minAnswerId = _getWinningAnswerIdOfQuestion(question);
-        for (
-            uint256 j = 0;
-            j < question.playersByAnswer[minAnswerId].length;
-            j++
-        ) {
-            address winner = question.playersByAnswer[minAnswerId][j];
-            if (winner == actualSender) {
-                game.scoreByAddress[winner] += 1;
-                // * question.playersByAnswer[minAnswerId].length;
-            }
-        }
-    }
-
-    function _getWinningAnswerIdOfQuestion(
-        Question storage question
-    ) internal view returns (uint8 winningAnswerId) {
-        if (question.distributed) revert AlreadyDistributed();
-        uint256 minCount = type(uint256).max;
-        winningAnswerId = 0;
-
-        for (uint8 i = 0; i < questions[question.questionId].answers.length; i++) {
-            uint256 count = question.playersByAnswer[i].length;
-
-            if (count < minCount) {
-                minCount = count;
-                winningAnswerId = i;
-            }
-        }
-    }
-
     function validateRaceId(uint256 raceId) public view {
-        if (raceId >= nextRaceId) revert InvalidRaceId();
+        require(raceId < nextRaceId, "Invalid race ID");
     }
 
-    function validateGameIndex(uint256 raceId, uint8 gameIndex) internal view {
-        if (gameIndex >= races[raceId].numOfGames) revert InvalidGameIndex();
-    }
-
-    function validateGameCompletion(uint256 raceId, string calldata gameName) public view {
-        validateRaceId(raceId);
-        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("underdog"))) {
-            // TODO: check for underdog game completion somehow (after the refactoring of the underdog game)
-        }
-        // check the rabbit-hole game to be completed
-        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("rabbit-hole"))) {
-            if (races[raceId].rabbitTunnel.winner == address(0)) revert GameIsNotComplted();
-        }
+    // Set the address for a specific contract
+    function registerContract(string memory name, address contractAddress) external {
+        targetContracts[name] = contractAddress;
     }
 
     /// Admin functions
-    function addQuestion(QuestionInfo memory params) external onlyOwner {
-        _addQuestion(params);
-    }
-
-    function addQuestions(QuestionInfo[] memory _questions) external onlyOwner {
-        for (uint256 index = 0; index < _questions.length; index++) {
-            _addQuestion(_questions[index]);
-        }
-    }
-
-    function _addQuestion(QuestionInfo memory params) internal {
-        QuestionInfo storage _question = questions[nextQuestionId];
-        _question.content = params.content;
-        _question.answers = params.answers;
-        _question.imgUrl = params.imgUrl;
-        nextQuestionId++;
-    }
-
-    function addGameName(string memory gameName) external onlyOwner {
-        gameNames[nextGameNameId] = gameName;
-        nextGameNameId++;
-    }
-
     function addRace(
-        string memory name,
         uint64 hoursBeforeFinish,
         uint8 numOfPlayersRequired,
-        GameParams[] memory games,
-        int256[3][3] calldata points
+        uint8 storyKey,
+        string[] memory screens,
+        bytes calldata initStateForBullrun, //int256[3][3] calldata points,
+        bytes calldata initStateForUnderdog //QuestionInfo[] calldata questions
     ) external {
-        if (userHasAdminAccess[msg.sender] == false && msg.sender != owner()) {
-            revert AccessDenied();
-        }
-        uint64 startAt = uint64(block.timestamp + (hoursBeforeFinish * 3600));
-        if (startAt < block.timestamp + MIN_SECONDS_BEFORE_START_RACE) revert InvalidTimestamp();
-        if (games.length == 0) revert EmptyQuestions();
+        require(userHasAdminAccess[msg.sender] == true || msg.sender == owner(), "Access denied");
+        
+        uint64 endAt = uint64(block.timestamp + (hoursBeforeFinish * 1 hours));
+        require(endAt > block.timestamp + MIN_SECONDS_BEFORE_START_RACE, "Invalid timestamp");
+
         Race storage _race = races[nextRaceId];
-        _race.name = name;
+        _race.id = nextRaceId;
         _race.numOfPlayersRequired = numOfPlayersRequired;
-        _race.startAt = startAt;
-        _race.numOfGames = uint8(games.length);
-        uint64 endAt = startAt;
-        uint8 _numOfQuestions = 0;
-        for (uint256 i = 0; i < games.length; i++) {
-            _race.games[i].gameId = games[i].gameId;
-            _race.games[i].numOfQuestions = uint8(games[i].questionIds.length);
-            for (uint8 j = 0; j < games[i].questionIds.length; j++) {
-                _race.games[i].questions[j].questionId = games[i].questionIds[
-                    j
-                ];
+        _race.endAt = endAt;
+        _race.screens = screens;
+        _race.storyKey = storyKey;
+
+        for (uint256 i = 0; i < screens.length; i++) {
+            // init underdog
+            if (keccak256(bytes(screens[i])) == keccak256(bytes("UNDERDOG"))) {
+                initRace("UNDERDOG", nextRaceId, initStateForUnderdog);
             }
 
-            endAt += GAME_DURATION;
-            _race.games[i].endAt = endAt;
-            _numOfQuestions += uint8(games[i].questionIds.length);
+            // init bullrun
+            if (keccak256(bytes(screens[i])) == keccak256(bytes("BULLRUN"))) {
+                initRace("BULLRUN", nextRaceId, initStateForBullrun);
+            }
+
+            // init rabbithole
+            // RABBITHOLE DOES NOT REQUIRE TO CALL THE initRace FUNCTION
         }
-
-        _race.numOfQuestions = _numOfQuestions;
-
-        
-        BULLRUN_setPointsPerPerksForRace(nextRaceId, points);
 
         nextRaceId++;
     }
 
-    function getQuestions(
-        uint256 raceId,
-        uint256 gameId
-    ) public view returns (QuestionInfoReturnType[] memory) {
-        uint256 length = races[raceId].games[gameId].numOfQuestions;
 
-        // Initialize an array to store QuestionInfoReturnType structs
-        QuestionInfoReturnType[] memory questionsInfo = new QuestionInfoReturnType[](length);
+    function getRaceStatus(uint256 raceId) public view returns (RaceStatus) {
+        if (raceId > nextRaceId) return RaceStatus.NON_EXIST;
+        Race storage race = races[raceId];
+        if (race.endAt < block.timestamp) return RaceStatus.CREATED;
+        //if (race.registeredUsers.length < NUM_OF_PLAYERS_PER_RACE)
+        //    return RaceStatus.CANCELLED;
 
-        // Populate the questionsInfo array
-        for (uint8 i = 0; i < length; i++) {
-            uint256 questionId = races[raceId].games[gameId].questions[i].questionId;
-            questionsInfo[i] = QuestionInfoReturnType({
-                id: questionId,
-                info: questions[questionId]
-            });
-        }
-
-        // Return the populated questionsInfo array
-        return questionsInfo;
+        return RaceStatus.STARTED;
     }
 
 
-    function getGameNames(uint256 id) public view returns (string memory) {
-        return gameNames[id];
-    }
-
-    function getRaces(
-        uint256 id,
-        address user
-    )
-        public
-        view
-        returns (
-            string memory name,
-            uint64 startAt,
-            uint8 numOfGames,
-            uint8 numOfQuestions,
-            uint256[] memory games,
-            uint256[] memory gamesCompletedPerUser,
-            uint256 raceDuration,
-            bool refunded,
-            address[] memory registeredUsers,
-            RabbitTunnel memory rabbitTunnel,
-            uint8 numOfPlayersRequired
-        )
-    {
+    function getRace(uint256 id, address user) public view returns (RaceInfo memory raceInfo) {
         Race storage race = races[id];
-        name = race.name;
-        startAt = race.startAt;
-        numOfGames = race.numOfGames;
-        numOfQuestions = race.numOfQuestions;
 
-        // Initialize an array to store gameIds
-        games = new uint256[](race.numOfGames);
+        raceInfo.id = race.id;
+
+        raceInfo.endAt = race.endAt;
         
-        // Populate the games array with gameIds
-        for (uint8 i = 0; i < race.numOfGames; i++) {
-            games[i] = race.games[i].gameId;
-        }
+        raceInfo.registered = race.playerRegistered[user];
 
-        // populate gamesCompleted per race
-        gamesCompletedPerUser = race.gamesCompleted[user];
+        raceInfo.refunded = race.refunded[user];
 
-        raceDuration = GAME_DURATION * race.numOfGames;
+        raceInfo.registeredUsers = race.registeredUsers;
 
-        refunded = race.refunded[user];
+        raceInfo.numOfPlayersRequired = race.numOfPlayersRequired;
 
-        registeredUsers = race.registeredUsers;
+        raceInfo.status = getRaceStatus(id);
 
-        rabbitTunnel = race.rabbitTunnel;
+        raceInfo.screens = race.screens;
 
-        numOfPlayersRequired = race.numOfPlayersRequired;
+        raceInfo.storyKey = race.storyKey;
     }
 
-    function getScoreAtGameOfUser(
-        uint256 raceId,
-        uint256 gameIndex,
-        address user,
-        string memory gameName
-    ) external view returns (uint256) {
-        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("underdog"))) {
-            return races[raceId].games[gameIndex].scoreByAddress[user];
-        } 
-
-        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("rabbit-hole"))) {
-            uint256 points = 0;
-            for (uint256 i = 0; i < races[raceId].rabbitTunnel.pointsAddresses.length; i++) {
-                if (races[raceId].rabbitTunnel.pointsAddresses[i] == user) {
-                    points = races[raceId].rabbitTunnel.pointsAmount[i];
-                }
-            }
-            return points;
-        }
-
-        if (keccak256(abi.encodePacked(gameName)) == keccak256(abi.encodePacked("bullrun"))) {
-            (address user1, address user2, address user3) = BULLRUN_getWinnersPerGame(raceId);
-
-            if (user1 == msg.sender) return 3;
-            if (user2 == msg.sender) return 2;
-            if (user3 == msg.sender) return 1;
-        }
-
-        return 0;
-    }
 
     function getScoreAtRaceOfUser(
         uint256 raceId, 
         address user
-    ) external view returns (uint256) {
-        uint256 scores = 0;
-        Race storage race = races[raceId];
-        
-        for (uint256 gameId = 0; gameId < race.numOfGames; gameId++) {
-            Game storage game = race.games[gameId];
-            scores += game.scoreByAddress[user];
-        }
+    ) public view returns (int256) {
+        int256 score = 0;
 
-        uint256 pointsRabbitTunnel = 0;
-        for (uint256 i = 0; i < races[raceId].rabbitTunnel.pointsAddresses.length; i++) {
-            if (races[raceId].rabbitTunnel.pointsAddresses[i] == user) {
-                pointsRabbitTunnel = races[raceId].rabbitTunnel.pointsAmount[i];
-            }
-        }
+        score += getPoints("UNDERDOG", user, raceId);
 
-        scores += pointsRabbitTunnel;
+        score += getPoints("RABBITHOLE", user, raceId);
 
-        (address user1, address user2, address user3) = BULLRUN_getWinnersPerGame(raceId);
-        if (user1 == user) scores += 3;
-        if (user2 == user) scores += 2;
-        if (user3 == user) scores += 1;
+        score += getPoints("BULLRUN", user, raceId);
 
-        return scores;
+        return score;
     }
 
     function getRacesWithPagination(
@@ -533,45 +268,61 @@ contract BlockSheep is Ownable, GAME_Bullrun {
         RaceInfo[] memory _races = new RaceInfo[](length);
         for (uint256 index = 0; index < length; index++) {
             Race storage race = races[index];
-            _races[index].name = race.name;
-            _races[index].startAt = race.startAt;
-            _races[index].numOfGames = race.numOfGames;
-            _races[index].numOfQuestions = race.numOfQuestions;
-            _races[index].registered = race.playerRegistered[user];
 
-            // Initialize an array to store gameIds
-            uint256[] memory games = new uint256[](race.numOfGames);
+            _races[index].id = race.id;
+
+            _races[index].endAt = race.endAt;
             
-            // Populate the games array with gameIds
-            for (uint8 i = 0; i < race.numOfGames; i++) {
-                games[i] = race.games[i].gameId;
-            }
-            _races[index].games = games;
-
-            _races[index].gamesCompletedPerUser = race.gamesCompleted[user];
-
-            _races[index].raceDuration = GAME_DURATION * race.numOfGames;
+            _races[index].registered = race.playerRegistered[user];
 
             _races[index].refunded = race.refunded[user];
 
             _races[index].registeredUsers = race.registeredUsers;
 
-            _races[index].rabbitTunnel = race.rabbitTunnel;
-
             _races[index].numOfPlayersRequired = race.numOfPlayersRequired;
+
+            _races[index].status = getRaceStatus(race.id);
+
+            _races[index].screens = race.screens;
+
+            _races[index].storyKey = race.storyKey;
         }
 
         return _races;
     }
 
-    function getRaceStatus(uint256 raceId) external view returns (RaceStatus) {
-        if (raceId > nextRaceId) return RaceStatus.NON_EXIST;
-        Race storage race = races[raceId];
-        if (race.startAt < block.timestamp) return RaceStatus.CREATED;
-        if (race.registeredUsers.length < NUM_OF_PLAYERS_PER_RACE)
-            return RaceStatus.CANCELLED;
-
-        return RaceStatus.STARTED;
+    // Function to check if a player is registered for a specific race
+    function isPlayerRegistered(uint256 raceId, address player) public view returns (bool) {
+        return races[raceId].playerRegistered[player];
     }
 
+
+
+    function getPoints(string memory gameName, address user, uint256 raceId) public view returns (int256) {
+        return IGameInterface(targetContracts[gameName]).getPoints(user, raceId);
+    }
+
+    function getUserChoices(string memory gameName, uint256 raceId, address user) public view returns (uint256[] memory) {
+        return IGameInterface(targetContracts[gameName]).getUserChoices(raceId, user);
+    }
+
+    function getWinner(string memory gameName, uint256 raceId) public view returns (address[] memory, int256[] memory) {
+        return IGameInterface(targetContracts[gameName]).getWinner(raceId);
+    }
+
+    function getRules(string memory gameName, uint256 raceId) public view returns (bytes memory) {
+        return IGameInterface(targetContracts[gameName]).getRules(raceId);
+    }
+
+    function makeMove(string memory gameName, uint256 raceId, bytes memory data) public {
+        IGameInterface(targetContracts[gameName]).makeMove(raceId, data);
+    }
+
+    function distribute(string memory gameName, uint256 raceId, bytes memory data) public {
+        IGameInterface(targetContracts[gameName]).distribute(raceId, data);
+    }
+
+    function initRace(string memory gameName, uint256 raceid, bytes memory data) public {
+        IGameInterface(targetContracts[gameName]).initRace(raceid, data);
+    }
 }
