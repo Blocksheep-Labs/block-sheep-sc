@@ -13,12 +13,12 @@ contract GameRabbitHole is IGameInterface {
 
     // Track users who have participated in each game
     //      raceId            roundId      user-addrs
-    mapping(uint256 => mapping(uint256 => address[])) private RABBITHOLE_roundParticipants;
+    mapping(uint256 => mapping(uint256 => address[])) public RABBITHOLE_roundParticipants;
 
     //        raceId           roundId           user         participated in?
     mapping(uint256 => mapping(uint256 => mapping(address => bool))) private RABBITHOLE_roundWasParticipated;
     //        raceId           roundId     user
-    mapping(uint256 => mapping(uint256 => address)) private RABBITHOLE_eliminatedAtRound;
+    mapping(uint256 => mapping(uint256 => address)) public RABBITHOLE_eliminatedAtRound;
 
     // track the distribution of the races by user
     mapping(uint256 => mapping(address => bool)) private RABBITHOLE_distributed;
@@ -48,7 +48,6 @@ contract GameRabbitHole is IGameInterface {
     }
 
     function getWinner(uint256 raceId) external view returns (address[] memory, int256[] memory) {
-        require(RABBITHOLE_distributed[raceId][msg.sender], "Not distributed yet");
         int256[] memory points = new int256[](RABBITHOLE_winners[raceId].length);
 
         for (uint256 i = 0; i < RABBITHOLE_winners[raceId].length; i++) {
@@ -66,19 +65,19 @@ contract GameRabbitHole is IGameInterface {
         uint256 raceId,
         bytes memory data
     ) external {
-        (uint256 fuelSubmission, uint256 fuelLeft, uint256 roundIndex) = abi.decode(data, (uint256, uint256, uint256));
+        (uint256 fuelSubmission, uint256 fuelLeft, uint256 roundIndex, address sender) = abi.decode(data, (uint256, uint256, uint256, address));
         
-        require(RABBITHOLE_roundWasParticipated[raceId][roundIndex][msg.sender] == false, "Already participated at round");
+        require(RABBITHOLE_roundWasParticipated[raceId][roundIndex][sender] == false, "Already participated at round");
 
         // if was not participated at the round, mark as participated and store fuel data
-        if (RABBITHOLE_roundWasParticipated[raceId][roundIndex][msg.sender] == false) {
-            RABBITHOLE_roundParticipants[raceId][roundIndex].push(msg.sender);
-            RABBITHOLE_usersChoices[raceId][roundIndex][msg.sender] = fuelSubmission;
-            RABBITHOLE_usersRemainingFuel[raceId][roundIndex][msg.sender] = fuelLeft;
+        if (RABBITHOLE_roundWasParticipated[raceId][roundIndex][sender] == false) {
+            RABBITHOLE_roundParticipants[raceId][roundIndex].push(sender);
+            RABBITHOLE_usersChoices[raceId][roundIndex][sender] = fuelSubmission;
+            RABBITHOLE_usersRemainingFuel[raceId][roundIndex][sender] = fuelLeft;
         }
 
         // mark user in round as participated
-        RABBITHOLE_roundWasParticipated[raceId][roundIndex][msg.sender] = true;
+        RABBITHOLE_roundWasParticipated[raceId][roundIndex][sender] = true;
 
         address eliminatedUser;
         uint256 minFuel = type(uint256).max;
@@ -105,55 +104,39 @@ contract GameRabbitHole is IGameInterface {
 
     function distribute(
         uint256 raceId,
-        bytes memory
+        bytes memory data
     ) external {
+        (address sender) = abi.decode(data, (address));
+
         require(RABBITHOLE_eliminatedAtRound[raceId][0] != address(0), "RaceId does not exist or no eliminations");
-        require(RABBITHOLE_distributed[raceId][msg.sender] == false, "Already distributed");
+        require(RABBITHOLE_distributed[raceId][sender] == false, "Already distributed");
 
         uint256 roundIndex = 0;
-
-        int256[] memory points = new int256[](3);
-        points[0] = 3; // First place
-        points[1] = 2; // Second place
-        points[2] = 1; // Third place
-
-        address[] memory topParticipants = new address[](3);
 
         // determine the maximum possible round index
         while (RABBITHOLE_eliminatedAtRound[raceId][roundIndex] != address(0)) {
             roundIndex++;
         }
 
-        // search top players at the game
-        for (uint256 rank = 0; rank < 3 && roundIndex > 0; rank++) {
-            address eliminatedPlayer = RABBITHOLE_eliminatedAtRound[raceId][roundIndex - 1];
+        address[] memory participantsAtRound = RABBITHOLE_roundParticipants[raceId][roundIndex - 1];
 
-            if (rank == 0) {
-                // winner - last non-eliminated player
-                address[] memory participantsAtRound = RABBITHOLE_roundParticipants[raceId][roundIndex - 1];
-                for (uint256 i = 0; i < participantsAtRound.length; i++) {
-                    if (participantsAtRound[i] != eliminatedPlayer) {
-                        topParticipants[rank] = participantsAtRound[i];
-                        break;
-                    }
-                }
-            } else {
-                topParticipants[rank] = eliminatedPlayer;
-            }
-
-            // go to the next rank
-            roundIndex--;
+        if (participantsAtRound.length == 2) {
+            RABBITHOLE_points[raceId][sender] = 3;
+            RABBITHOLE_winners[raceId].push(sender);
         }
 
-        // allocate points to the list of top players
-        for (uint256 i = 0; i < 3; i++) {
-            if (topParticipants[i] != address(0)) {
-                RABBITHOLE_points[raceId][topParticipants[i]] = points[i];
-                RABBITHOLE_winners[raceId].push(topParticipants[i]);
-            }
+        if (participantsAtRound.length == 1) {
+            RABBITHOLE_points[raceId][sender] = 2;
+            RABBITHOLE_winners[raceId].push(sender);
         }
+
+        if (participantsAtRound.length == 0) {
+            RABBITHOLE_points[raceId][sender] = 1;
+            RABBITHOLE_winners[raceId].push(sender);
+        }
+
         // set game as distributed
-        RABBITHOLE_distributed[raceId][msg.sender] = true;
+        RABBITHOLE_distributed[raceId][sender] = true;
     }
 
     function getRules(uint256 raceId) external pure returns (bytes memory) {

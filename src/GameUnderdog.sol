@@ -98,17 +98,17 @@ contract GameUnderdog is IGameInterface {
         uint256 raceId,
         bytes memory data
     ) external {
-        (uint8 questionIndex, uint8 answerIndex) = abi.decode(data, (uint8, uint8));
+        (uint8 questionIndex, uint8 answerIndex, address sender) = abi.decode(data, (uint8, uint8, address));
         
         // Check if the player has already answered this question
-        require(UNDERDOG_usersAnswers[raceId][msg.sender][questionIndex] == false, "Player has already answered this question");
+        require(UNDERDOG_usersAnswers[raceId][sender][questionIndex] == false, "Player has already answered this question");
 
         // Mark the question as answered and store the user's choice
-        UNDERDOG_usersAnswers[raceId][msg.sender][questionIndex] = true;
-        UNDERDOG_usersChoices[raceId][msg.sender][questionIndex] = answerIndex;
+        UNDERDOG_usersAnswers[raceId][sender][questionIndex] = true;
+        UNDERDOG_usersChoices[raceId][sender][questionIndex] = answerIndex;
 
         // Add the player to the list of answered players for the specific question
-        UNDERDOG_answeredPlayers[raceId][questionIndex].push(msg.sender);
+        UNDERDOG_answeredPlayers[raceId][questionIndex].push(sender);
     }
 
     function distribute(
@@ -131,7 +131,7 @@ contract GameUnderdog is IGameInterface {
         QuestionInfoReturnType[] memory questionsInfo = new QuestionInfoReturnType[](length);
 
         // Populate the questionsInfo array
-        for (uint8 i = 0; i < length; i++) {
+        for (uint256 i = 0; i < length; i++) {
             questionsInfo[i] = QuestionInfoReturnType({
                 id: i,
                 info: UNDERDOG_questions[raceId][i]
@@ -141,8 +141,6 @@ contract GameUnderdog is IGameInterface {
         // Return the populated questionsInfo array
         return abi.encode(questionsInfo);
     }
-
-
 
     function _distributeRewardOfQuestion(
         uint256 raceId,
