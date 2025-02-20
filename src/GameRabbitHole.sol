@@ -113,26 +113,41 @@ contract GameRabbitHole is IGameInterface {
 
         uint256 roundIndex = 0;
 
-        // determine the maximum possible round index
-        while (RABBITHOLE_eliminatedAtRound[raceId][roundIndex] != address(0)) {
+        // determine the maximum possible round index user played
+        while (
+            RABBITHOLE_eliminatedAtRound[raceId][roundIndex] != address(0)
+        ) {
             roundIndex++;
+
+            if (RABBITHOLE_eliminatedAtRound[raceId][roundIndex] == sender) {
+                break;
+            }
         }
+
+
 
         address[] memory participantsAtRound = RABBITHOLE_roundParticipants[raceId][roundIndex - 1];
 
-        if (participantsAtRound.length == 2) {
-            RABBITHOLE_points[raceId][sender] = 3;
-            RABBITHOLE_winners[raceId].push(sender);
-        }
-
-        if (participantsAtRound.length == 1) {
-            RABBITHOLE_points[raceId][sender] = 2;
-            RABBITHOLE_winners[raceId].push(sender);
-        }
-
-        if (participantsAtRound.length == 0) {
+        // eliminated when there wer 3 players in game
+        if (participantsAtRound.length == 3) {
             RABBITHOLE_points[raceId][sender] = 1;
             RABBITHOLE_winners[raceId].push(sender);
+        } 
+        // eliminated or survived when there wer 2 players in game
+        else if (participantsAtRound.length == 2) {
+            // 2 nd place
+            if (RABBITHOLE_eliminatedAtRound[raceId][roundIndex] == sender) {
+                RABBITHOLE_points[raceId][sender] = 2;
+            } 
+            // 1st place
+            else {
+                RABBITHOLE_points[raceId][sender] = 3;
+            }
+            RABBITHOLE_winners[raceId].push(sender);
+        } 
+        // eliminated with > 3 players alive
+        else {
+            RABBITHOLE_points[raceId][sender] = 0;
         }
 
         // set game as distributed
