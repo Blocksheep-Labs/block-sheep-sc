@@ -1,9 +1,12 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
 import "../src/BlockSheep.sol";
 import "../lib/forge-std/src/Script.sol";
 
 contract AddAdmin is Script {
     BlockSheep internal blockSheep =
-        BlockSheep(0x181b8bf1E2B454f0F2B17826cd5898c529BAc696);
+        BlockSheep(0x4b1104dcB19f04a353AE4e704f07d61ba2325069);
 
     function run() external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
