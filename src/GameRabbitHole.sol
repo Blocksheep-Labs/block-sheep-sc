@@ -112,35 +112,36 @@ contract GameRabbitHole is IGameInterface {
         require(RABBITHOLE_distributed[raceId][sender] == false, "Already distributed");
 
         uint256 roundIndex = 0;
+        bool found = false;
 
-        // determine the maximum possible round index user played
-        while (
-            RABBITHOLE_eliminatedAtRound[raceId][roundIndex] != address(0)
-        ) {
-            roundIndex++;
-
+        // Find the round where sender was eliminated
+        while (RABBITHOLE_eliminatedAtRound[raceId][roundIndex] != address(0)) {
             if (RABBITHOLE_eliminatedAtRound[raceId][roundIndex] == sender) {
+                found = true;
                 break;
             }
+            roundIndex++;
         }
 
+        require(found, "Sender was not eliminated");
 
+        address[] memory participantsAtRound = RABBITHOLE_roundParticipants[raceId][roundIndex];
 
-        address[] memory participantsAtRound = RABBITHOLE_roundParticipants[raceId][roundIndex - 1];
+        require(participantsAtRound.length > 0, "Invalid round data");
 
-        // eliminated when there wer 3 players in game
+        // eliminated when there were 3 players in game
         if (participantsAtRound.length == 3) {
             RABBITHOLE_points[raceId][sender] = 1;
             RABBITHOLE_winners[raceId].push(sender);
         } 
-        // eliminated or survived when there wer 2 players in game
+        // eliminated or survived when there were 2 players in game
         else if (participantsAtRound.length == 2) {
-            // 2 nd place
             if (RABBITHOLE_eliminatedAtRound[raceId][roundIndex] == sender) {
+                // 2nd place
                 RABBITHOLE_points[raceId][sender] = 2;
-            } 
-            // 1st place
-            else {
+            } else {
+                // Ensure sender was actually the last survivor before assigning 1st place
+                require(RABBITHOLE_eliminatedAtRound[raceId][roundIndex + 1] == address(0), "Game not over yet");
                 RABBITHOLE_points[raceId][sender] = 3;
             }
             RABBITHOLE_winners[raceId].push(sender);
@@ -153,6 +154,7 @@ contract GameRabbitHole is IGameInterface {
         // set game as distributed
         RABBITHOLE_distributed[raceId][sender] = true;
     }
+
 
     function getRules(uint256 raceId) external pure returns (bytes memory) {
         return abi.encode(raceId);
