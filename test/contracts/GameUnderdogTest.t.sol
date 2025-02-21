@@ -1,4 +1,4 @@
-// test/contracts/GameUnderdogTest.t.sol
+// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
 import { Test } from "forge-std/Test.sol";
@@ -45,7 +45,7 @@ contract GameUnderdogTest is Test {
     function testMakeMove() public {
         // Player 1 makes a move
         vm.prank(player1);
-        bytes memory data = abi.encode(uint8(0), uint8(1)); // Question index 0, answer index 1
+        bytes memory data = abi.encode(uint8(0), uint8(1), player1); // Question index 0, answer index 1
         game.makeMove(raceId, data);
         
         // Check that player1's choice is recorded
@@ -56,7 +56,7 @@ contract GameUnderdogTest is Test {
     function testGetUserChoices() public {
         // Player 1 makes a move
         vm.prank(player1);
-        bytes memory data = abi.encode(uint8(0), uint8(1)); // Question index 0, answer index 1
+        bytes memory data = abi.encode(uint8(0), uint8(1), player1); // Question index 0, answer index 1
         game.makeMove(raceId, data);
         
         // Check user choices
@@ -66,7 +66,8 @@ contract GameUnderdogTest is Test {
 
     function testGetPoints() public {
         // Player 1 makes a move
-        bytes memory data = abi.encode(uint8(0), uint8(1)); // Question index 0, answer index 1
+        vm.prank(player1);
+        bytes memory data = abi.encode(uint8(0), uint8(1), player1); // Question index 0, answer index 1
         game.makeMove(raceId, data);
         
         // Check points for player1
@@ -77,15 +78,15 @@ contract GameUnderdogTest is Test {
     function testDistribute() public {
         // Simulate moves for players
         vm.prank(player1);
-        bytes memory data1 = abi.encode(uint8(0), uint8(1)); // Player 1's move
+        bytes memory data1 = abi.encode(uint8(0), uint8(1), player1); // Player 1's move
         game.makeMove(raceId, data1);
         
         vm.prank(player2);
-        bytes memory data2 = abi.encode(uint8(0), uint8(0)); // Player 2's move
+        bytes memory data2 = abi.encode(uint8(0), uint8(0), player2); // Player 2's move
         game.makeMove(raceId, data2);
 
         vm.prank(player3);
-        bytes memory data3 = abi.encode(uint8(0), uint8(0)); // Player 3's move
+        bytes memory data3 = abi.encode(uint8(0), uint8(0), player3); // Player 3's move
         game.makeMove(raceId, data3);
         
         // Distribute results

@@ -41,7 +41,7 @@ contract GameBullrunTest is Test {
     function testMakeMove() public {
         // Alice makes a move against Bob
         vm.prank(alice);
-        game.makeMove(raceId, abi.encode(0, bob));
+        game.makeMove(raceId, abi.encode(0, bob, alice));
 
         // Verify Alice's choice
         uint256[] memory aliceChoices = game.getUserChoices(raceId, alice);
@@ -51,73 +51,73 @@ contract GameBullrunTest is Test {
     function testCannotPlayAgainstSelf() public {
         vm.prank(alice);
         vm.expectRevert("Cannot play against yourself");
-        game.makeMove(raceId, abi.encode(0, alice));
+        game.makeMove(raceId, abi.encode(0, alice, alice));
     }
 
     function testCannotPlayWithSameOpponentTwice() public {
         // First move
         vm.prank(alice);
-        game.makeMove(raceId, abi.encode(0, bob));
+        game.makeMove(raceId, abi.encode(0, bob, alice));
 
         // Try to play with same opponent again
         vm.prank(alice);
         vm.expectRevert("Already played with this opponent");
-        game.makeMove(raceId, abi.encode(1, bob));
+        game.makeMove(raceId, abi.encode(1, bob, alice));
     }
 
     function testDistributePoints() public {
         // Alice makes a move against Bob
         vm.prank(alice);
-        game.makeMove(raceId, abi.encode(0, bob));
+        game.makeMove(raceId, abi.encode(0, bob, alice));
 
         // Bob makes a move against Alice
         vm.prank(bob);
-        game.makeMove(raceId, abi.encode(1, alice));
+        game.makeMove(raceId, abi.encode(1, alice, bob));
 
         // Distribute points
         vm.prank(alice);
-        game.distribute(raceId, abi.encode(bob));
+        game.distribute(raceId, abi.encode(bob, alice));
 
         // Check points
         int256 alicePoints = game.getPoints(alice, raceId);
         int256 bobPoints = game.getPoints(bob, raceId);
         
-        assertEq(alicePoints, -1); // Based on the points matrix [0][1] = -1
-        assertEq(bobPoints, 1);    // Based on the points matrix [1][0] = 1
+        assertEq(alicePoints, 2); // Based on the points matrix [0][1] = -1
+        assertEq(bobPoints, 3);    // Based on the points matrix [1][0] = 1
     }
 
     function testDistributeWhenOnePlayerDidNotMove() public {
         // Only Alice makes a move
         vm.prank(alice);
-        game.makeMove(raceId, abi.encode(0, bob));
+        game.makeMove(raceId, abi.encode(0, bob, alice));
 
         // Distribute points
         vm.prank(alice);
-        game.distribute(raceId, abi.encode(bob));
+        game.distribute(raceId, abi.encode(bob, alice));
 
         // Check points
         int256 alicePoints = game.getPoints(alice, raceId);
         int256 bobPoints = game.getPoints(bob, raceId);
         
-        assertEq(alicePoints, 1);  // Alice should get +1 for making a move
-        assertEq(bobPoints, -1);   // Bob should get -1 for not making a move
+        assertEq(alicePoints, 3);  // Alice should get +1 for making a move
+        assertEq(bobPoints, 2);   // Bob should get -1 for not making a move
     }
 
     function testGetWinner() public {
         // Set up a scenario with multiple players
         vm.prank(alice);
-        game.makeMove(raceId, abi.encode(0, bob));
+        game.makeMove(raceId, abi.encode(0, bob, alice));
         vm.prank(bob);
-        game.makeMove(raceId, abi.encode(1, alice));
+        game.makeMove(raceId, abi.encode(1, alice, bob));
         vm.prank(alice);
-        game.distribute(raceId, abi.encode(bob));
+        game.distribute(raceId, abi.encode(bob, alice));
 
         vm.prank(bob);
-        game.makeMove(raceId, abi.encode(1, charlie));
+        game.makeMove(raceId, abi.encode(1, charlie, bob));
         vm.prank(charlie);
-        game.makeMove(raceId, abi.encode(2, bob));
+        game.makeMove(raceId, abi.encode(2, bob, charlie));
         vm.prank(bob);
-        game.distribute(raceId, abi.encode(charlie));
+        game.distribute(raceId, abi.encode(charlie, bob));
 
         (address[] memory winners, int256[] memory points) = game.getWinner(raceId);
         

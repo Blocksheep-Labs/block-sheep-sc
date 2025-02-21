@@ -123,7 +123,10 @@ contract GameRabbitHole is IGameInterface {
             roundIndex++;
         }
 
-        require(found, "Sender was not eliminated");
+        // normalize the index if no user elimination was found
+        if (!found) {
+            roundIndex--;
+        }
 
         address[] memory participantsAtRound = RABBITHOLE_roundParticipants[raceId][roundIndex];
 
