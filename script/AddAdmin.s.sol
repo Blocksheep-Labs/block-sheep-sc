@@ -12,7 +12,7 @@ contract AddAdmin is Script {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        blockSheep.setAdminRights(0x0e7f5b922AE381a532F80BFd145CEb2C382F9970, true);
+        blockSheep.setAdminRights(0x217c6a10e854C05dAEdceCfDF51F101E739D2c60, true);
 
         vm.stopBroadcast();
     }

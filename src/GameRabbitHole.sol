@@ -65,7 +65,13 @@ contract GameRabbitHole is IGameInterface {
         uint256 raceId,
         bytes memory data
     ) external {
-        (uint256 fuelSubmission, uint256 fuelLeft, uint256 roundIndex, address sender) = abi.decode(data, (uint256, uint256, uint256, address));
+        (
+            uint256 fuelSubmission, 
+            uint256 fuelLeft, 
+            uint256 roundIndex, 
+            address sender,
+            address[] memory inGame
+        ) = abi.decode(data, (uint256, uint256, uint256, address, address[]));
         
         require(RABBITHOLE_roundWasParticipated[raceId][roundIndex][sender] == false, "Already participated at round");
 
@@ -74,6 +80,20 @@ contract GameRabbitHole is IGameInterface {
             RABBITHOLE_roundParticipants[raceId][roundIndex].push(sender);
             RABBITHOLE_usersChoices[raceId][roundIndex][sender] = fuelSubmission;
             RABBITHOLE_usersRemainingFuel[raceId][roundIndex][sender] = fuelLeft;
+
+            
+            // set all other users fuel 0 if no submission yet
+            for (uint256 i = 0; i < inGame.length; i++) {
+                // inGame[i] is a unique user that participates with sender
+                // user is not eliminated yet
+                if (
+                    RABBITHOLE_eliminatedAtRound[raceId][roundIndex] != inGame[i] && 
+                    RABBITHOLE_usersChoices[raceId][roundIndex][inGame[i]] <= 0
+                ) {
+                    // set submitted fuel to 0
+                    RABBITHOLE_usersChoices[raceId][roundIndex][inGame[i]] = 0;
+                }
+            }
         }
 
         // mark user in round as participated
