@@ -70,7 +70,7 @@ contract GameRabbitHole is IGameInterface {
             uint256 fuelLeft, 
             uint256 roundIndex, 
             address sender,
-            address[] memory inGame
+            address[] memory leavedUsers
         ) = abi.decode(data, (uint256, uint256, uint256, address, address[]));
         
         require(RABBITHOLE_roundWasParticipated[raceId][roundIndex][sender] == false, "Already participated at round");
@@ -83,15 +83,22 @@ contract GameRabbitHole is IGameInterface {
 
             
             // set all other users fuel 0 if no submission yet
-            for (uint256 i = 0; i < inGame.length; i++) {
+            for (uint256 i = 0; i < leavedUsers.length; i++) {
                 // inGame[i] is a unique user that participates with sender
                 // user is not eliminated yet
                 if (
-                    RABBITHOLE_eliminatedAtRound[raceId][roundIndex] != inGame[i] && 
-                    RABBITHOLE_usersChoices[raceId][roundIndex][inGame[i]] <= 0
+                    RABBITHOLE_eliminatedAtRound[raceId][roundIndex] != leavedUsers[i] && 
+                    RABBITHOLE_usersChoices[raceId][roundIndex][leavedUsers[i]] <= 0
                 ) {
+                    // Ensure leavedUsers[i] is not already in the participants array
+                    if (!contains(RABBITHOLE_roundParticipants[raceId][roundIndex], leavedUsers[i])) {
+                        RABBITHOLE_roundParticipants[raceId][roundIndex].push(leavedUsers[i]);
+                    }
                     // set submitted fuel to 0
-                    RABBITHOLE_usersChoices[raceId][roundIndex][inGame[i]] = 0;
+                    RABBITHOLE_usersChoices[raceId][roundIndex][leavedUsers[i]] = 0;
+                    RABBITHOLE_usersRemainingFuel[raceId][roundIndex][leavedUsers[i]] = 0;
+                    // leaved user participated at round
+                    RABBITHOLE_roundWasParticipated[raceId][roundIndex][leavedUsers[i]] = true;
                 }
             }
         }
@@ -181,5 +188,16 @@ contract GameRabbitHole is IGameInterface {
 
     function getRules(uint256 raceId) external pure returns (bytes memory) {
         return abi.encode(raceId);
+    }
+
+
+    // Function to check if a user is already in the array
+    function contains(address[] storage arr, address user) internal view returns (bool) {
+        for (uint256 j = 0; j < arr.length; j++) {
+            if (arr[j] == user) {
+                return true;
+            }
+        }
+        return false;
     }
 }
