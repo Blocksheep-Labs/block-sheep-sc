@@ -93,12 +93,13 @@ contract GameRabbitHole is IGameInterface {
                     // Ensure leavedUsers[i] is not already in the participants array
                     if (!contains(RABBITHOLE_roundParticipants[raceId][roundIndex], leavedUsers[i])) {
                         RABBITHOLE_roundParticipants[raceId][roundIndex].push(leavedUsers[i]);
+                        
+                        // set submitted fuel to 0
+                        RABBITHOLE_usersChoices[raceId][roundIndex][leavedUsers[i]] = 0;
+                        RABBITHOLE_usersRemainingFuel[raceId][roundIndex][leavedUsers[i]] = 0;
+                        // leaved user participated at round
+                        RABBITHOLE_roundWasParticipated[raceId][roundIndex][leavedUsers[i]] = true;
                     }
-                    // set submitted fuel to 0
-                    RABBITHOLE_usersChoices[raceId][roundIndex][leavedUsers[i]] = 0;
-                    RABBITHOLE_usersRemainingFuel[raceId][roundIndex][leavedUsers[i]] = 0;
-                    // leaved user participated at round
-                    RABBITHOLE_roundWasParticipated[raceId][roundIndex][leavedUsers[i]] = true;
                 }
             }
         }
