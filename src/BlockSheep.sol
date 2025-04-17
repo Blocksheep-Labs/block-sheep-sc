@@ -302,6 +302,10 @@ contract BlockSheep is Ownable {
         return IGameInterface(targetContracts[gameName]).getPoints(user, raceId);
     }
 
+    function getInternalScore(string memory gameName, address user, uint256 raceId) public view returns (int256) {
+        return IGameInterface(targetContracts[gameName]).getInternalScore(user, raceId);
+    }
+
     function getUserChoices(string memory gameName, uint256 raceId, address user) public view returns (uint256[] memory) {
         return IGameInterface(targetContracts[gameName]).getUserChoices(raceId, user);
     }

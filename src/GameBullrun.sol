@@ -89,6 +89,10 @@ contract GameBullrun is IGameInterface {
         }
     }
 
+    function getInternalScore(address user, uint256 raceId) public view returns (int256) {
+        return BULLRUN_usersChoices[raceId][user].points;
+    }
+
     // function to retrieve user choices indexes
     function getUserChoices(uint256 raceId, address user) public view returns (uint256[] memory) {
         return BULLRUN_usersChoices[raceId][user].selectedPerks;

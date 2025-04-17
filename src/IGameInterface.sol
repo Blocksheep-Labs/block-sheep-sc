@@ -6,6 +6,8 @@ pragma solidity ^0.8.20;
 interface IGameInterface {
     function getPoints(address user, uint256 raceId) external view returns (int256);
 
+    function getInternalScore(address user, uint256 raceId) external view returns (int256);
+
     function getUserChoices(uint256 raceId, address user) external  view returns (uint256[] memory);
 
     function getWinner(uint256 raceId) external view returns (address[] memory, int256[] memory);

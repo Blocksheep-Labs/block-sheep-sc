@@ -30,6 +30,10 @@ contract GameRabbitHole is IGameInterface {
         return RABBITHOLE_points[raceId][user];
     }
 
+    function getInternalScore(address, uint256) public pure returns (int256) {
+        return 0;
+    }
+
     function getUserChoices(uint256 raceId, address user) public view returns (uint256[] memory) {
         uint256 roundIndex = 0;
 

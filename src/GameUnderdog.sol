@@ -80,6 +80,10 @@ contract GameUnderdog is IGameInterface {
         return UNDERDOG_points[raceId][user];
     }
 
+    function getInternalScore(address, uint256) public pure returns (int256) {
+        return 0;
+    }
+
     function getUserChoices(uint256 raceId, address user) external view returns (uint256[] memory) {
         uint256 questionsCount = UNDERDOG_questions[raceId].length;
 
