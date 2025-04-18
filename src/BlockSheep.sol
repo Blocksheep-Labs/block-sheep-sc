@@ -329,4 +329,17 @@ contract BlockSheep is Ownable {
     function initRace(string memory gameName, uint256 raceid, bytes memory data) public {
         IGameInterface(targetContracts[gameName]).initRace(raceid, data);
     }
+
+    function staticCallAnyGameFunction(
+        string memory gameName,
+        bytes memory functionSignature
+    ) public view returns (bytes memory) {
+        address target = targetContracts[gameName];
+        require(target != address(0), "Game not found");
+
+        (bool success, bytes memory result) = target.staticcall(functionSignature);
+        require(success, "Static call failed");
+
+        return result;
+    }
 }
