@@ -48,31 +48,43 @@ contract GameUnderdog is IGameInterface {
     }
 
     function getWinner(uint256 raceId) public view returns (address[] memory, int256[] memory) {
-        address[] memory players;
-        int256[] memory points;
-        uint256 index = 0;
-
+        // First count the total unique players
+        uint256 uniquePlayerCount = 0;
+        address[] memory tempPlayers = new address[](9); // Temporary array with maximum possible size
+        int256[] memory tempPoints = new int256[](9);    // Temporary array with maximum possible size
+        
         // Loop through all questions to collect the addresses of the players who answered
         for (uint8 qIndex = 0; qIndex < UNDERDOG_questions[raceId].length; qIndex++) {
             address[] memory answeredPlayers = UNDERDOG_answeredPlayers[raceId][qIndex];
-
+            
             for (uint256 i = 0; i < answeredPlayers.length; i++) {
-                // Avoid duplicates by checking if the player is already in tempPlayers array
+                // Check if player is already in tempPlayers array
                 bool exists = false;
-                for (uint256 j = 0; j < players.length; j++) {
-                    if (players[j] == answeredPlayers[i]) {
+                for (uint256 j = 0; j < uniquePlayerCount; j++) {
+                    if (tempPlayers[j] == answeredPlayers[i]) {
                         exists = true;
                         break;
                     }
                 }
+                
                 if (!exists) {
-                    players[index] = answeredPlayers[i];
-                    points[index] = getPoints(answeredPlayers[i], raceId);
-                    index++;
+                    tempPlayers[uniquePlayerCount] = answeredPlayers[i];
+                    tempPoints[uniquePlayerCount] = getPoints(answeredPlayers[i], raceId);
+                    uniquePlayerCount++;
                 }
             }
         }
-
+        
+        // Create properly sized arrays for the return values
+        address[] memory players = new address[](uniquePlayerCount);
+        int256[] memory points = new int256[](uniquePlayerCount);
+        
+        // Copy the data from the temporary arrays
+        for (uint256 i = 0; i < uniquePlayerCount; i++) {
+            players[i] = tempPlayers[i];
+            points[i] = tempPoints[i];
+        }
+        
         return (players, points);
     }
 
