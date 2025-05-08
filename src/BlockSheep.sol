@@ -26,6 +26,10 @@ contract BlockSheep is Ownable {
 
     mapping(string => address) public targetContracts;
 
+    // race start fast tap points
+    mapping(uint256 => mapping(address => int256)) public raceStartPoints;
+    mapping(uint256 => mapping(address => bool)) public raceStartPassed;
+
     enum RaceStatus {
         NON_EXIST,
         CREATED,
@@ -79,7 +83,7 @@ contract BlockSheep is Ownable {
     function withdraw(uint256 amount) external {
         require(amount > 0, "Amount must be greater than zero");
         require(balances[msg.sender] >= amount, "Insufficient balance");
-        
+
         balances[msg.sender] -= amount;
         UNDERLYING.safeTransfer(msg.sender, amount);
     }
@@ -102,13 +106,13 @@ contract BlockSheep is Ownable {
         require(!race.refunded[msg.sender], "Already refunded");
 
         RaceInfo memory raceInfoById = getRace(raceId, msg.sender);
-        
+
         uint256 userCount = raceInfoById.registeredUsers.length;
         require(userCount > 0, "No users in race");
 
         address[] memory users = new address[](userCount);
         int256[] memory points = new int256[](userCount);
-        
+
         // Fill users and points arrays
         for (uint256 i = 0; i < userCount; i++) {
             users[i] = raceInfoById.registeredUsers[i];
@@ -143,7 +147,7 @@ contract BlockSheep is Ownable {
         require(race.playerRegistered[msg.sender] == false, "Already registered");
         require(race.registeredUsers.length < race.numOfPlayersRequired, "Race is full");
         require(balances[msg.sender] >= COST, "Not enough balance");
-        
+
         balances[msg.sender] -= COST;
         race.playerRegistered[msg.sender] = true;
         race.registeredUsers.push(msg.sender);
@@ -174,7 +178,7 @@ contract BlockSheep is Ownable {
         bytes calldata initStateForUnderdog //QuestionInfo[] calldata questions
     ) external {
         require(userHasAdminAccess[msg.sender] == true || msg.sender == owner(), "Access denied");
-        
+
         uint64 endAt = uint64(block.timestamp + (hoursBeforeFinish * 1 hours));
         require(endAt > block.timestamp + MIN_SECONDS_BEFORE_START_RACE, "Invalid timestamp");
 
@@ -221,7 +225,7 @@ contract BlockSheep is Ownable {
         raceInfo.id = race.id;
 
         raceInfo.endAt = race.endAt;
-        
+
         raceInfo.registered = race.playerRegistered[user];
 
         raceInfo.refunded = race.refunded[user];
@@ -239,7 +243,7 @@ contract BlockSheep is Ownable {
 
 
     function getScoreAtRaceOfUser(
-        uint256 raceId, 
+        uint256 raceId,
         address user
     ) public view returns (int256) {
         int256 score = 0;
@@ -250,7 +254,16 @@ contract BlockSheep is Ownable {
 
         score += getPoints("BULLRUN", user, raceId);
 
+        score += raceStartPoints[raceId][user];
+
         return score;
+    }
+
+    function saveRaceStartPointsForUser(address user, uint256 raceId, int256 points) external {
+        require(raceStartPassed[raceId][user] == false, "Already passed");
+        raceStartPassed[raceId][user] = true;
+
+        raceStartPoints[raceId][user] = points;
     }
 
     function getRacesWithPagination(
@@ -272,7 +285,7 @@ contract BlockSheep is Ownable {
             _races[index].id = race.id;
 
             _races[index].endAt = race.endAt;
-            
+
             _races[index].registered = race.playerRegistered[user];
 
             _races[index].refunded = race.refunded[user];
