@@ -23,6 +23,9 @@ contract GameUnderdog is IGameInterface {
     // Store players who answered each question for each race
     mapping(uint256 => mapping(uint8 => address[])) private UNDERDOG_answeredPlayers;
 
+    // Store user group 'minority/majority' when distribute happens
+    mapping(uint256 => mapping(uint8 => mapping(address => bool))) private UNDERDOG_isInMinorityGroup;
+
 
     struct QuestionInfo {
         string content;
@@ -52,11 +55,11 @@ contract GameUnderdog is IGameInterface {
         uint256 uniquePlayerCount = 0;
         address[] memory tempPlayers = new address[](9); // Temporary array with maximum possible size
         int256[] memory tempPoints = new int256[](9);    // Temporary array with maximum possible size
-        
+
         // Loop through all questions to collect the addresses of the players who answered
         for (uint8 qIndex = 0; qIndex < UNDERDOG_questions[raceId].length; qIndex++) {
             address[] memory answeredPlayers = UNDERDOG_answeredPlayers[raceId][qIndex];
-            
+
             for (uint256 i = 0; i < answeredPlayers.length; i++) {
                 // Check if player is already in tempPlayers array
                 bool exists = false;
@@ -66,7 +69,7 @@ contract GameUnderdog is IGameInterface {
                         break;
                     }
                 }
-                
+
                 if (!exists) {
                     tempPlayers[uniquePlayerCount] = answeredPlayers[i];
                     tempPoints[uniquePlayerCount] = getPoints(answeredPlayers[i], raceId);
@@ -74,17 +77,17 @@ contract GameUnderdog is IGameInterface {
                 }
             }
         }
-        
+
         // Create properly sized arrays for the return values
         address[] memory players = new address[](uniquePlayerCount);
         int256[] memory points = new int256[](uniquePlayerCount);
-        
+
         // Copy the data from the temporary arrays
         for (uint256 i = 0; i < uniquePlayerCount; i++) {
             players[i] = tempPlayers[i];
             points[i] = tempPoints[i];
         }
-        
+
         return (players, points);
     }
 
@@ -114,7 +117,7 @@ contract GameUnderdog is IGameInterface {
         bytes memory data
     ) external {
         (uint8 questionIndex, uint8 answerIndex, address sender) = abi.decode(data, (uint8, uint8, address));
-        
+
         // Check if the player has already answered this question
         require(UNDERDOG_usersAnswers[raceId][sender][questionIndex] == false, "Player has already answered this question");
 
@@ -128,12 +131,19 @@ contract GameUnderdog is IGameInterface {
 
     function distribute(
         uint256 raceId,
-        bytes memory
+        bytes memory data
     ) external {
-        // Iterate through the questions in the mapping and distribute rewards
-        for (uint8 questionIndex = 0; questionIndex < UNDERDOG_questions[raceId].length; questionIndex++) {
+        (uint8 questionIndex, bool distributeAll) = abi.decode(data, (uint8, bool));
+
+        if (distributeAll) {
+            // Iterate through the questions in the mapping and distribute rewards
+            for (uint8 qIndex = 0; questionIndex < UNDERDOG_questions[raceId].length; qIndex++) {
+                _distributeRewardOfQuestion(raceId, qIndex);
+            }
+        } else {
             _distributeRewardOfQuestion(raceId, questionIndex);
         }
+
     }
 
 
@@ -161,6 +171,11 @@ contract GameUnderdog is IGameInterface {
         uint256 raceId,
         uint8 questionIndex
     ) internal {
+        // If already distributed the question
+        if (UNDERDOG_pointsDistributed[raceId][questionIndex]) {
+            return;
+        }
+
         // Get the question info
         QuestionInfo[] storage questions = UNDERDOG_questions[raceId];
 
@@ -178,7 +193,7 @@ contract GameUnderdog is IGameInterface {
             answerCounts[playerAnswer]++;
         }
 
-        
+
         // If it's a draw, skip reward distribution
         bool isDraw = true; // draw initially
         uint256 firstCount = answerCounts[0]; // Get the first count to compare against
@@ -193,7 +208,7 @@ contract GameUnderdog is IGameInterface {
         if (isDraw) {
             return; // Skip reward distribution if it's a draw
         }
-        
+
 
         // Determine the winning answer ID (answer with the smallest number of players)
         uint8 winningAnswerId = _getWinningAnswerIdWithSmallestCount(answerCounts);
@@ -204,6 +219,7 @@ contract GameUnderdog is IGameInterface {
             if (!UNDERDOG_pointsDistributed[raceId][questionIndex]) {
                 if (UNDERDOG_usersChoices[raceId][answeredPlayersList[i]][questionIndex] == winningAnswerId) {
                     UNDERDOG_points[raceId][answeredPlayersList[i]] += 1; // Update points for the winner
+                    UNDERDOG_isInMinorityGroup[raceId][questionIndex][answeredPlayersList[i]] = true; // user should be in minority
                 }
             }
         }
