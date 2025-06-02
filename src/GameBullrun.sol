@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import { IGameInterface } from "./IGameInterface.sol";
 
 contract GameBullrun is IGameInterface {
+    int256 private constant BPS = 1000;
     // Struct to track user rooms
     struct BULLRUN_Room {
         uint256 userPerkIndex;
@@ -23,7 +24,7 @@ contract GameBullrun is IGameInterface {
     mapping(uint256 => mapping(address => BULLRUN_UserChoices)) private BULLRUN_usersChoices;
 
     // Unique identifier for each session
-    //       raceId             user             opponent     
+    //       raceId             user             opponent
     mapping(uint256 => mapping(address => mapping(address => BULLRUN_Room))) private BULLRUN_gameSessions;
 
     // points per perks per raceId
@@ -34,6 +35,12 @@ contract GameBullrun is IGameInterface {
 
 
     mapping(uint256 => mapping(address => mapping(address => bool))) private BULLRUN_opponentsPlayed;
+
+    // user changed tires
+    mapping(uint256 => mapping(address => bool)) public BULLRUN_changedTyresBeforeTheGame;
+
+    // user jumped an onstacle
+    mapping(uint256 => mapping(address => bool)) public BULLRUN_jumpedAnObstacleBeforeTheGame;
 
 
 
@@ -77,16 +84,31 @@ contract GameBullrun is IGameInterface {
             }
         }
 
+        bool changedTiresBeforeTheGame = BULLRUN_changedTyresBeforeTheGame[raceId][user];
+        bool jumpedAnObstacleBeforeTheGame = BULLRUN_jumpedAnObstacleBeforeTheGame[raceId][user];
+
+        int256 points = 0;
+
         // Assign points based on ranking
         if (user == highestUser) {
-            return 3;
+            points = 3 * BPS;
         } else if (user == secondHighestUser) {
-            return 2;
+            points = 2 * BPS;
         } else if (user == thirdHighestUser) {
-            return 1;
-        } else {
-            return 0;
+            points = 1 * BPS;
         }
+
+        // changed tyres before the game
+        if (changedTiresBeforeTheGame) {
+            points = points * 25 / 10;
+        }
+
+        // user not jumped an obstace before the game
+        if (jumpedAnObstacleBeforeTheGame == false) {
+            points -= 1;
+        }
+
+        return points;
     }
 
     function getInternalScore(address user, uint256 raceId) public view returns (int256) {
@@ -182,7 +204,7 @@ contract GameBullrun is IGameInterface {
             }
         }
 
-        if (currentRoom.userPerkWasSet && opponentRoom.userPerkWasSet) {  
+        if (currentRoom.userPerkWasSet && opponentRoom.userPerkWasSet) {
             // Update points for both user and opponent
             if (!currentRoom.distributed) {
                 int256 userPoints = BULLRUN_pointsPerPerks[raceId][uint256(currentRoom.userPerkIndex)][uint256(opponentRoom.userPerkIndex)];
@@ -203,7 +225,7 @@ contract GameBullrun is IGameInterface {
 
     function initRace(uint256 raceId, bytes calldata initState) public {
         int256[3][3] memory points = abi.decode(initState, (int256[3][3]));
-        
+
         require(points.length > 0, "Points matrix cannot be empty");
 
         for (uint256 i = 0; i < points.length; i++) {
@@ -274,7 +296,15 @@ contract GameBullrun is IGameInterface {
         return abi.encode(perksMatrix);
     }
 
-    
+    function changeTyres(uint256 raceId, address user) public {
+        BULLRUN_changedTyresBeforeTheGame[raceId][user] = true;
+    }
+
+    function jumpAnObstacle(uint256 raceId, address user) public {
+        BULLRUN_jumpedAnObstacleBeforeTheGame[raceId][user] = true;
+    }
+
+
     // Utility function to check if a user has already participated in a race
     function _isParticipant(uint256 raceId, address user) internal view returns (bool) {
         for (uint256 i = 0; i < BULLRUN_gameParticipants[raceId].length; i++) {

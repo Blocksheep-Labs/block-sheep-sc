@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import { IGameInterface } from "./IGameInterface.sol";
 
 contract GameRabbitHole is IGameInterface {
+    int256 private constant BPS = 1000;
     // user chioces by gameId
     //        raceId           roundId           user          fuelSubmitted
     mapping(uint256 => mapping(uint256 => mapping(address => uint256))) private RABBITHOLE_usersChoices;
@@ -25,9 +26,25 @@ contract GameRabbitHole is IGameInterface {
 
     mapping(uint256 => address[]) private RABBITHOLE_winners;
 
+    // user changed tires
+    mapping(uint256 => mapping(address => bool)) public RABBITHOLE_changedTyresBeforeTheGame;
+
+    // user jumped an obstacle
+    mapping(uint256 => mapping(address => bool)) public RABBITHOLE_jumpedAnObstacleBeforeTheGame;
+
 
     function getPoints(address user, uint256 raceId) public view returns (int256) {
-        return RABBITHOLE_points[raceId][user];
+        int256 points = RABBITHOLE_points[raceId][user];
+
+        if (RABBITHOLE_changedTyresBeforeTheGame[raceId][user]) {
+            points = points * 25 / 10;
+        }
+
+        if (RABBITHOLE_jumpedAnObstacleBeforeTheGame[raceId][user] == false) {
+            points -= 1;
+        }
+
+        return points;
     }
 
     function getInternalScore(address, uint256) public pure returns (int256) {
@@ -70,13 +87,13 @@ contract GameRabbitHole is IGameInterface {
         bytes memory data
     ) external {
         (
-            uint256 fuelSubmission, 
-            uint256 fuelLeft, 
-            uint256 roundIndex, 
+            uint256 fuelSubmission,
+            uint256 fuelLeft,
+            uint256 roundIndex,
             address sender,
             address[] memory leavedUsers
         ) = abi.decode(data, (uint256, uint256, uint256, address, address[]));
-        
+
         require(RABBITHOLE_roundWasParticipated[raceId][roundIndex][sender] == false, "Already participated at round");
 
         // if was not participated at the round, mark as participated and store fuel data
@@ -85,19 +102,19 @@ contract GameRabbitHole is IGameInterface {
             RABBITHOLE_usersChoices[raceId][roundIndex][sender] = fuelSubmission;
             RABBITHOLE_usersRemainingFuel[raceId][roundIndex][sender] = fuelLeft;
 
-            
+
             // set all other users fuel 0 if no submission yet
             for (uint256 i = 0; i < leavedUsers.length; i++) {
                 // inGame[i] is a unique user that participates with sender
                 // user is not eliminated yet
                 if (
-                    RABBITHOLE_eliminatedAtRound[raceId][roundIndex] != leavedUsers[i] && 
+                    RABBITHOLE_eliminatedAtRound[raceId][roundIndex] != leavedUsers[i] &&
                     RABBITHOLE_usersChoices[raceId][roundIndex][leavedUsers[i]] <= 0
                 ) {
                     // Ensure leavedUsers[i] is not already in the participants array
                     if (!contains(RABBITHOLE_roundParticipants[raceId][roundIndex], leavedUsers[i])) {
                         RABBITHOLE_roundParticipants[raceId][roundIndex].push(leavedUsers[i]);
-                        
+
                         // set submitted fuel to 0
                         RABBITHOLE_usersChoices[raceId][roundIndex][leavedUsers[i]] = 0;
                         RABBITHOLE_usersRemainingFuel[raceId][roundIndex][leavedUsers[i]] = 0;
@@ -166,22 +183,22 @@ contract GameRabbitHole is IGameInterface {
 
         // eliminated when there were 3 players in game
         if (participantsAtRound.length == 3) {
-            RABBITHOLE_points[raceId][sender] = 1;
+            RABBITHOLE_points[raceId][sender] = 1 * BPS;
             RABBITHOLE_winners[raceId].push(sender);
-        } 
-        // eliminated or survived when there were 2 players in game
+        }
+            // eliminated or survived when there were 2 players in game
         else if (participantsAtRound.length == 2) {
             if (RABBITHOLE_eliminatedAtRound[raceId][roundIndex] == sender) {
                 // 2nd place
-                RABBITHOLE_points[raceId][sender] = 2;
+                RABBITHOLE_points[raceId][sender] = 2 * BPS;
             } else {
                 // Ensure sender was actually the last survivor before assigning 1st place
                 require(RABBITHOLE_eliminatedAtRound[raceId][roundIndex + 1] == address(0), "Game not over yet");
-                RABBITHOLE_points[raceId][sender] = 3;
+                RABBITHOLE_points[raceId][sender] = 3 * BPS;
             }
             RABBITHOLE_winners[raceId].push(sender);
-        } 
-        // eliminated with > 3 players alive
+        }
+            // eliminated with > 3 players alive
         else {
             RABBITHOLE_points[raceId][sender] = 0;
         }
@@ -195,6 +212,13 @@ contract GameRabbitHole is IGameInterface {
         return abi.encode(raceId);
     }
 
+    function changeTyres(uint256 raceId, address user)public {
+        RABBITHOLE_changedTyresBeforeTheGame[raceId][user] = true;
+    }
+
+    function jumpAnObstacle(uint256 raceId, address user) public {
+        RABBITHOLE_jumpedAnObstacleBeforeTheGame[raceId][user] = true;
+    }
 
     // Function to check if a user is already in the array
     function contains(address[] storage arr, address user) internal view returns (bool) {

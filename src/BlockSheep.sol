@@ -10,10 +10,8 @@ import { IGameInterface } from "./IGameInterface.sol";
 contract BlockSheep is Ownable {
     using SafeERC20 for IERC20;
 
+    int256 private constant BPS = 1000;
     uint64 private constant MIN_SECONDS_BEFORE_START_RACE = 5 minutes;
-
-    IERC20 public immutable UNDERLYING;
-    uint256 public immutable COST;
 
     mapping(address => uint256) public balances;
 
@@ -26,9 +24,15 @@ contract BlockSheep is Ownable {
 
     mapping(string => address) public targetContracts;
 
+    // users who bought race entry
+    mapping(uint256 => mapping(address => bool)) public payedRaceEntries;
+
     // race start fast tap points
     mapping(uint256 => mapping(address => int256)) public raceStartPoints;
     mapping(uint256 => mapping(address => bool)) public raceStartPassed;
+
+    mapping(uint256 => mapping(address => int256)) public raceUpdatePenaltyPoints;
+
 
     enum RaceStatus {
         NON_EXIST,
@@ -39,6 +43,7 @@ contract BlockSheep is Ownable {
     }
 
     struct Race {
+        uint8 entryPrice;
         uint8 storyKey;
         uint8 numOfPlayersRequired;
         uint64 endAt;
@@ -52,6 +57,7 @@ contract BlockSheep is Ownable {
     struct RaceInfo {
         bool refunded;
         bool registered;
+        uint8 entryPrice;
         uint8 storyKey;
         uint8 numOfPlayersRequired;
         uint64 endAt;
@@ -62,42 +68,30 @@ contract BlockSheep is Ownable {
     }
 
     event Registered(address user, uint256 amount);
+    event Deposited(address user, uint256 amount, uint256 balance);
+    event Withdrawed(address user, uint256 amount, uint256 balance);
 
     constructor(
-        address _underlying,
-        address owner,
-        uint256 _cost
+        address owner
     ) Ownable(owner) {
-        UNDERLYING = IERC20(_underlying);
-        COST = _cost;
         userHasAdminAccess[owner] = true;
     }
 
-    function deposit(uint256 amount) external {
+    function deposit(uint256 amount, address user) external onlyOwner {
         require(amount > 0, "Amount to buy must be greater than zero");
+        balances[user] += amount;
 
-        UNDERLYING.safeTransferFrom(msg.sender, address(this), amount);
-        balances[msg.sender] += amount;
+        emit Deposited(user, amount, balances[user]);
     }
 
     function withdraw(uint256 amount) external {
         require(amount > 0, "Amount must be greater than zero");
         require(balances[msg.sender] >= amount, "Insufficient balance");
-
         balances[msg.sender] -= amount;
-        UNDERLYING.safeTransfer(msg.sender, amount);
+
+        emit Withdrawed(msg.sender, amount, balances[msg.sender]);
     }
 
-    function refundBalance(uint256 amount, uint256 raceId) external {
-        Race storage race = races[raceId];
-        require(race.endAt < block.timestamp, "Race is not finished");
-        require(race.playerRegistered[msg.sender] == true, "Not registered");
-        require(race.refunded[msg.sender] == false, "Already refunded");
-
-
-        balances[msg.sender] += amount;
-        race.refunded[msg.sender] = true;
-    }
 
     function refundWinningBalance(uint256 raceId) external {
         Race storage race = races[raceId];
@@ -106,53 +100,83 @@ contract BlockSheep is Ownable {
         require(!race.refunded[msg.sender], "Already refunded");
 
         RaceInfo memory raceInfoById = getRace(raceId, msg.sender);
+        address[] memory users = raceInfoById.registeredUsers;
+        uint256 userCount = users.length;
+        require(userCount > 1, "Not enough users in race");
 
-        uint256 userCount = raceInfoById.registeredUsers.length;
-        require(userCount > 0, "No users in race");
-
-        address[] memory users = new address[](userCount);
-        int256[] memory points = new int256[](userCount);
-
-        // Fill users and points arrays
+        // Gather user + score pairs
+        address[] memory sortedUsers = new address[](userCount);
+        int256[] memory scores = new int256[](userCount);
         for (uint256 i = 0; i < userCount; i++) {
-            users[i] = raceInfoById.registeredUsers[i];
-            points[i] = getScoreAtRaceOfUser(raceId, users[i]);
+            sortedUsers[i] = users[i];
+            scores[i] = getScoreAtRaceOfUser(raceId, users[i]);
         }
 
-        // Determine msg.sender's position in the race
-        uint256 position = userCount;
+        // Sort by score descending using simple bubble sort (for clarity)
+        for (uint256 i = 0; i < userCount - 1; i++) {
+            for (uint256 j = i + 1; j < userCount; j++) {
+                if (scores[j] > scores[i]) {
+                    // Swap scores
+                    int256 tempScore = scores[i];
+                    scores[i] = scores[j];
+                    scores[j] = tempScore;
+
+                    // Swap users to keep alignment
+                    address tempUser = sortedUsers[i];
+                    sortedUsers[i] = sortedUsers[j];
+                    sortedUsers[j] = tempUser;
+                }
+            }
+        }
+
+        // Determine position of msg.sender
+        uint256 rank = userCount;
+        int256 userScore = 0;
         for (uint256 i = 0; i < userCount; i++) {
-            if (users[i] == msg.sender) {
-                position = i;
+            if (sortedUsers[i] == msg.sender) {
+                rank = i;
+                userScore = scores[i];
                 break;
             }
         }
 
-        require(position < userCount, "User not found in race");
+        require(userScore > 0, "No refund for 0 points");
 
-        // Calculate bonus based on position (example: higher rank gets more bonus)
-        uint256 bonus = (userCount - position) * 10**18;
+        uint256 topK = userCount / 2;
+        require(rank < topK, "Only top half get refund");
 
-        uint256 amount = COST + bonus;
+        // Calculate bonus, linear decay from COST to 0 across topK ranks
+        uint256 bonus = 0;
+        if (topK > 1) {
+            bonus = race.entryPrice * (topK - rank) / (topK - 1); // full bonus at top, 0 at lowest eligible
+        } else {
+            bonus = race.entryPrice; // edge case: only 1 top user
+        }
 
-        balances[msg.sender] += amount;
+        uint256 refundAmount = race.entryPrice + bonus;
+        balances[msg.sender] += refundAmount;
         race.refunded[msg.sender] = true;
     }
 
 
-    function register(uint256 raceId) external {
+
+    function register(uint256 raceId, address user) external onlyOwner {
         Race storage race = races[raceId];
         require(raceId < nextRaceId, "Invalid race ID");
-        require(block.timestamp < race.endAt, "Race is not finished");
-        require(race.playerRegistered[msg.sender] == false, "Already registered");
+        require(block.timestamp < race.endAt, "Race is finished");
+        require(race.playerRegistered[user] == false, "Already registered");
         require(race.registeredUsers.length < race.numOfPlayersRequired, "Race is full");
-        require(balances[msg.sender] >= COST, "Not enough balance");
+        require(balances[user] >= race.entryPrice, "Not enough balance");
 
-        balances[msg.sender] -= COST;
-        race.playerRegistered[msg.sender] = true;
-        race.registeredUsers.push(msg.sender);
+        uint256 ethAmount = 0.0012 ether;
+        require(address(this).balance >= ethAmount, "Insufficient ETH in contract");
+        payable(user).transfer(ethAmount);
 
-        emit Registered(msg.sender, COST);
+        balances[user] -= race.entryPrice;
+        race.playerRegistered[user] = true;
+        race.registeredUsers.push(user);
+
+        emit Registered(user, race.entryPrice);
     }
 
     function setAdminRights(address user, bool isAdmin) external onlyOwner {
@@ -170,6 +194,7 @@ contract BlockSheep is Ownable {
 
     /// Admin functions
     function addRace(
+        uint8 entryPrice,
         uint64 hoursBeforeFinish,
         uint8 numOfPlayersRequired,
         uint8 storyKey,
@@ -183,6 +208,7 @@ contract BlockSheep is Ownable {
         require(endAt > block.timestamp + MIN_SECONDS_BEFORE_START_RACE, "Invalid timestamp");
 
         Race storage _race = races[nextRaceId];
+        _race.entryPrice = entryPrice;
         _race.id = nextRaceId;
         _race.numOfPlayersRequired = numOfPlayersRequired;
         _race.endAt = endAt;
@@ -222,6 +248,8 @@ contract BlockSheep is Ownable {
     function getRace(uint256 id, address user) public view returns (RaceInfo memory raceInfo) {
         Race storage race = races[id];
 
+        raceInfo.entryPrice = race.entryPrice;
+
         raceInfo.id = race.id;
 
         raceInfo.endAt = race.endAt;
@@ -259,11 +287,11 @@ contract BlockSheep is Ownable {
         return score;
     }
 
-    function saveRaceStartPointsForUser(address user, uint256 raceId, int256 points) external {
-        require(raceStartPassed[raceId][user] == false, "Already passed");
-        raceStartPassed[raceId][user] = true;
+    function saveRaceStartPoints(uint256 raceId, int256 points) external {
+        require(raceStartPassed[raceId][msg.sender] == false, "Already passed");
+        raceStartPassed[raceId][msg.sender] = true;
 
-        raceStartPoints[raceId][user] = points;
+        raceStartPoints[raceId][msg.sender] = points;
     }
 
     function getRacesWithPagination(
@@ -281,6 +309,8 @@ contract BlockSheep is Ownable {
         RaceInfo[] memory _races = new RaceInfo[](length);
         for (uint256 index = 0; index < length; index++) {
             Race storage race = races[index];
+
+            _races[index].entryPrice = race.entryPrice;
 
             _races[index].id = race.id;
 
@@ -339,9 +369,19 @@ contract BlockSheep is Ownable {
         IGameInterface(targetContracts[gameName]).distribute(raceId, data);
     }
 
-    function initRace(string memory gameName, uint256 raceid, bytes memory data) public {
-        IGameInterface(targetContracts[gameName]).initRace(raceid, data);
+    function initRace(string memory gameName, uint256 raceId, bytes memory data) public {
+        IGameInterface(targetContracts[gameName]).initRace(raceId, data);
     }
+
+    function changeTyres(string memory gameName, uint256 raceId, address user) public {
+        raceUpdatePenaltyPoints[raceId][user] += 2 * BPS;
+        IGameInterface(targetContracts[gameName]).changeTyres(raceId, user);
+    }
+
+    function jumpAnObstacle(string memory gameName, uint256 raceId, address user) public {
+        IGameInterface(targetContracts[gameName]).jumpAnObstacle(raceId, user);
+    }
+
 
     function staticCallAnyGameFunction(
         string memory gameName,

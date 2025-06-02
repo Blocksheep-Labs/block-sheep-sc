@@ -5,6 +5,8 @@ import { IGameInterface } from "./IGameInterface.sol";
 
 
 contract GameUnderdog is IGameInterface {
+    int256 private constant BPS = 1000;
+
     // User choices by raceId, user address, and questionIndex
     mapping(uint256 => mapping(address => mapping(uint8 => uint256))) private UNDERDOG_usersChoices;
 
@@ -25,6 +27,12 @@ contract GameUnderdog is IGameInterface {
 
     // Store user group 'minority/majority' when distribute happens
     mapping(uint256 => mapping(uint8 => mapping(address => bool))) private UNDERDOG_isInMinorityGroup;
+
+    // user changed tires
+    mapping(uint256 => mapping(address => bool)) public UNDERDOG_changedTyresBeforeTheGame;
+
+    // user jumped an obstacle
+    mapping(uint256 => mapping(address => bool)) public UNDERDOG_jumpedAnObstacleBeforeTheGame;
 
 
     struct QuestionInfo {
@@ -92,7 +100,17 @@ contract GameUnderdog is IGameInterface {
     }
 
     function getPoints(address user, uint256 raceId) public view returns (int256) {
-        return UNDERDOG_points[raceId][user];
+        int256 points = UNDERDOG_points[raceId][user];
+
+        if (UNDERDOG_changedTyresBeforeTheGame[raceId][user]) {
+            points = points * 25 / 10;
+        }
+
+        if (UNDERDOG_jumpedAnObstacleBeforeTheGame[raceId][user] == false) {
+            points -= 1;
+        }
+
+        return points;
     }
 
     function getInternalScore(address, uint256) public pure returns (int256) {
@@ -218,7 +236,8 @@ contract GameUnderdog is IGameInterface {
             // Check if points have already been distributed for this question
             if (!UNDERDOG_pointsDistributed[raceId][questionIndex]) {
                 if (UNDERDOG_usersChoices[raceId][answeredPlayersList[i]][questionIndex] == winningAnswerId) {
-                    UNDERDOG_points[raceId][answeredPlayersList[i]] += 1; // Update points for the winner
+                    UNDERDOG_points[raceId][answeredPlayersList[i]] += 1 * BPS; // Update points for the winner
+
                     UNDERDOG_isInMinorityGroup[raceId][questionIndex][answeredPlayersList[i]] = true; // user should be in minority
                 }
             }
@@ -226,6 +245,15 @@ contract GameUnderdog is IGameInterface {
 
         // Mark points as distributed for this question
         UNDERDOG_pointsDistributed[raceId][questionIndex] = true;
+    }
+
+
+    function changeTyres(uint256 raceId, address user) public {
+        UNDERDOG_changedTyresBeforeTheGame[raceId][user] = true;
+    }
+
+    function jumpAnObstacle(uint256 raceId, address user) public {
+        UNDERDOG_jumpedAnObstacleBeforeTheGame[raceId][user] = true;
     }
 
     // Helper function to get the winning answer ID with the smallest count
