@@ -168,10 +168,6 @@ contract BlockSheep is Ownable {
         require(race.registeredUsers.length < race.numOfPlayersRequired, "Race is full");
         require(balances[user] >= race.entryPrice, "Not enough balance");
 
-        uint256 ethAmount = 0.0012 ether;
-        require(address(this).balance >= ethAmount, "Insufficient ETH in contract");
-        payable(user).transfer(ethAmount);
-
         balances[user] -= race.entryPrice;
         race.playerRegistered[user] = true;
         race.registeredUsers.push(user);
@@ -283,6 +279,8 @@ contract BlockSheep is Ownable {
         score += getPoints("BULLRUN", user, raceId);
 
         score += raceStartPoints[raceId][user];
+
+        score -= raceUpdatePenaltyPoints[raceId][user];
 
         return score;
     }
