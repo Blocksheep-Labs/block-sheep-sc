@@ -29,19 +29,12 @@ contract GameRabbitHole is IGameInterface {
     // user changed tires
     mapping(uint256 => mapping(address => bool)) public RABBITHOLE_changedTyresBeforeTheGame;
 
-    // user jumped an obstacle
-    mapping(uint256 => mapping(address => bool)) public RABBITHOLE_jumpedAnObstacleBeforeTheGame;
-
 
     function getPoints(address user, uint256 raceId) public view returns (int256) {
         int256 points = RABBITHOLE_points[raceId][user];
 
         if (RABBITHOLE_changedTyresBeforeTheGame[raceId][user]) {
             points = points * 25 / 10;
-        }
-
-        if (RABBITHOLE_jumpedAnObstacleBeforeTheGame[raceId][user] == false) {
-            points -= 1;
         }
 
         return points;
@@ -214,10 +207,6 @@ contract GameRabbitHole is IGameInterface {
 
     function changeTyres(uint256 raceId, address user)public {
         RABBITHOLE_changedTyresBeforeTheGame[raceId][user] = true;
-    }
-
-    function jumpAnObstacle(uint256 raceId, address user) public {
-        RABBITHOLE_jumpedAnObstacleBeforeTheGame[raceId][user] = true;
     }
 
     // Function to check if a user is already in the array

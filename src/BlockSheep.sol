@@ -31,7 +31,9 @@ contract BlockSheep is Ownable {
     mapping(uint256 => mapping(address => int256)) public raceStartPoints;
     mapping(uint256 => mapping(address => bool)) public raceStartPassed;
 
-    mapping(uint256 => mapping(address => int256)) public raceUpdatePenaltyPoints;
+    // raceId      // event (game, other stuff)   // user    // negative points
+    mapping(uint256 => mapping(string => mapping(address => int256))) public raceUpdatePenaltyPoints;
+    mapping(uint256 => mapping(string => bool)) public raceUpdatePenaltyPointsEnabled;
 
 
     enum RaceStatus {
@@ -272,6 +274,7 @@ contract BlockSheep is Ownable {
     ) public view returns (int256) {
         int256 score = 0;
 
+        // positive points
         score += getPoints("UNDERDOG", user, raceId);
 
         score += getPoints("RABBITHOLE", user, raceId);
@@ -280,7 +283,30 @@ contract BlockSheep is Ownable {
 
         score += raceStartPoints[raceId][user];
 
-        score -= raceUpdatePenaltyPoints[raceId][user];
+        // negative points
+        if (
+            raceUpdatePenaltyPoints[raceId]["OBSTACLE_UNDERDOG"][user] != -1 * BPS &&
+        raceUpdatePenaltyPointsEnabled[raceId]["OBSTACLE_UNDERDOG"]
+        ) {
+            score -= 1 * BPS;
+        }
+
+        if (
+            raceUpdatePenaltyPoints[raceId]["OBSTACLE_RABBITHOLE"][user] != -1 * BPS &&
+        raceUpdatePenaltyPointsEnabled[raceId]["OBSTACLE_RABBITHOLE"]) {
+            score -= 1 * BPS;
+        }
+
+        if (
+            raceUpdatePenaltyPoints[raceId]["OBSTACLE_BULLRUN"][user] != -1 * BPS &&
+        raceUpdatePenaltyPointsEnabled[raceId]["OBSTACLE_BULLRUN"]
+        ) {
+            score -= 1 * BPS;
+        }
+
+        if (raceUpdatePenaltyPointsEnabled[raceId]["CHANGE_TYRES"]) {
+            score -= raceUpdatePenaltyPoints[raceId]["CHANGE_TYRES"][user];
+        }
 
         return score;
     }
@@ -371,13 +397,17 @@ contract BlockSheep is Ownable {
         IGameInterface(targetContracts[gameName]).initRace(raceId, data);
     }
 
+
     function changeTyres(string memory gameName, uint256 raceId, address user) public {
-        raceUpdatePenaltyPoints[raceId][user] += 2 * BPS;
+        raceUpdatePenaltyPoints[raceId]["CHANGE_TYRES"][user] += 2 * BPS;
+        raceUpdatePenaltyPointsEnabled[raceId]["CHANGE_TYRES"] = true;
         IGameInterface(targetContracts[gameName]).changeTyres(raceId, user);
     }
 
     function jumpAnObstacle(string memory gameName, uint256 raceId, address user) public {
-        IGameInterface(targetContracts[gameName]).jumpAnObstacle(raceId, user);
+        string memory event_name = string(abi.encodePacked("OBSTACLE_", gameName));
+        raceUpdatePenaltyPoints[raceId][event_name][user] = -1 * BPS;
+        raceUpdatePenaltyPointsEnabled[raceId][event_name] = true;
     }
 
 

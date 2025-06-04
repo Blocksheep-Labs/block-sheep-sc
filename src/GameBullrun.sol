@@ -39,9 +39,6 @@ contract GameBullrun is IGameInterface {
     // user changed tires
     mapping(uint256 => mapping(address => bool)) public BULLRUN_changedTyresBeforeTheGame;
 
-    // user jumped an onstacle
-    mapping(uint256 => mapping(address => bool)) public BULLRUN_jumpedAnObstacleBeforeTheGame;
-
 
 
     // function to retrieve user points
@@ -85,7 +82,6 @@ contract GameBullrun is IGameInterface {
         }
 
         bool changedTiresBeforeTheGame = BULLRUN_changedTyresBeforeTheGame[raceId][user];
-        bool jumpedAnObstacleBeforeTheGame = BULLRUN_jumpedAnObstacleBeforeTheGame[raceId][user];
 
         int256 points = 0;
 
@@ -101,11 +97,6 @@ contract GameBullrun is IGameInterface {
         // changed tyres before the game
         if (changedTiresBeforeTheGame) {
             points = points * 25 / 10;
-        }
-
-        // user not jumped an obstace before the game
-        if (jumpedAnObstacleBeforeTheGame == false) {
-            points -= 1;
         }
 
         return points;
@@ -298,10 +289,6 @@ contract GameBullrun is IGameInterface {
 
     function changeTyres(uint256 raceId, address user) public {
         BULLRUN_changedTyresBeforeTheGame[raceId][user] = true;
-    }
-
-    function jumpAnObstacle(uint256 raceId, address user) public {
-        BULLRUN_jumpedAnObstacleBeforeTheGame[raceId][user] = true;
     }
 
 
