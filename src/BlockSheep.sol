@@ -27,13 +27,10 @@ contract BlockSheep is Ownable {
     // users who bought race entry
     mapping(uint256 => mapping(address => bool)) public payedRaceEntries;
 
-    // race start fast tap points
-    mapping(uint256 => mapping(address => int256)) public raceStartPoints;
-    mapping(uint256 => mapping(address => bool)) public raceStartPassed;
-
     // raceId      // event (game, other stuff)   // user    // negative points
-    mapping(uint256 => mapping(string => mapping(address => int256))) public raceUpdatePenaltyPoints;
-    mapping(uint256 => mapping(string => bool)) public raceUpdatePenaltyPointsEnabled;
+    mapping(uint256 => mapping(string => mapping(address => int256))) public raceUpdateBonusMalusPoints;
+    mapping(uint256 => mapping(string => mapping(address => bool))) public raceUpdateBonusMalusPointsOfUser;
+    mapping(uint256 => mapping(string => bool)) public raceUpdateBonusMalusPointsEnabled;
 
 
     enum RaceStatus {
@@ -162,7 +159,9 @@ contract BlockSheep is Ownable {
 
 
 
-    function register(uint256 raceId, address user) external onlyOwner {
+    function register(uint256 raceId, address user) external {
+        require(userHasAdminAccess[msg.sender] == true || msg.sender == owner(), "Access denied");
+
         Race storage race = races[raceId];
         require(raceId < nextRaceId, "Invalid race ID");
         require(block.timestamp < race.endAt, "Race is finished");
@@ -272,51 +271,55 @@ contract BlockSheep is Ownable {
         uint256 raceId,
         address user
     ) public view returns (int256) {
+        Race storage race = races[raceId];
         int256 score = 0;
 
-        // positive points
-        score += getPoints("UNDERDOG", user, raceId);
+        // Loop through all screen names dynamically
+        for (uint256 i = 0; i < race.screens.length; i++) {
+            string memory screen = race.screens[i];
 
-        score += getPoints("RABBITHOLE", user, raceId);
+            // 1. Base points: {SCREEN}, but it has to be registered as a game contract
+            if (targetContracts[screen] != address(0)) {
+                score += getPoints(screen, user, raceId);
+            }
 
-        score += getPoints("BULLRUN", user, raceId);
+            // 2. Sprint bonus: SPRINT_{SCREEN}
+            string memory sprintKey = string(abi.encodePacked("SPRINT_", screen));
+            if (raceUpdateBonusMalusPointsEnabled[raceId][sprintKey]) {
+                score += raceUpdateBonusMalusPoints[raceId][sprintKey][user];
+            }
 
-        score += raceStartPoints[raceId][user];
+            // 3. Obstacle malus: OBSTACLE_{SCREEN}
+            string memory obstacleKey = string(abi.encodePacked("OBSTACLE_", screen));
+            if (raceUpdateBonusMalusPointsEnabled[raceId][obstacleKey]) {
+                int256 value = raceUpdateBonusMalusPoints[raceId][obstacleKey][user];
+                if (value != 1 * BPS) {
+                    score -= 1 * BPS;
+                }
+            }
 
-        // negative points
-        if (
-            raceUpdatePenaltyPoints[raceId]["OBSTACLE_UNDERDOG"][user] != -1 * BPS &&
-        raceUpdatePenaltyPointsEnabled[raceId]["OBSTACLE_UNDERDOG"]
-        ) {
-            score -= 1 * BPS;
+            // 4. Change tyres penalty: CHANGE_TYRES_{SCREEN}
+            string memory tyresKey = string(abi.encodePacked("CHANGE_TYRES_", screen));
+            if (raceUpdateBonusMalusPointsEnabled[raceId][tyresKey]) {
+                score -= raceUpdateBonusMalusPoints[raceId][tyresKey][user];
+            }
+
+            // 5. Bonuses from mini-games like "steering wheel in underdog"
+            string memory bonusKey = string(abi.encodePacked("BONUS_", screen));
+            if (raceUpdateBonusMalusPointsEnabled[raceId][bonusKey]) {
+                score += raceUpdateBonusMalusPoints[raceId][bonusKey][user];
+            }
         }
 
-        if (
-            raceUpdatePenaltyPoints[raceId]["OBSTACLE_RABBITHOLE"][user] != -1 * BPS &&
-        raceUpdatePenaltyPointsEnabled[raceId]["OBSTACLE_RABBITHOLE"]) {
-            score -= 1 * BPS;
-        }
-
-        if (
-            raceUpdatePenaltyPoints[raceId]["OBSTACLE_BULLRUN"][user] != -1 * BPS &&
-        raceUpdatePenaltyPointsEnabled[raceId]["OBSTACLE_BULLRUN"]
-        ) {
-            score -= 1 * BPS;
-        }
-
-        if (raceUpdatePenaltyPointsEnabled[raceId]["CHANGE_TYRES"]) {
-            score -= raceUpdatePenaltyPoints[raceId]["CHANGE_TYRES"][user];
+        // Add race start points (not tied to screen)
+        if (raceUpdateBonusMalusPointsEnabled[raceId]["RACE_START"]) {
+            score += raceUpdateBonusMalusPoints[raceId]["RACE_START"][user];
         }
 
         return score;
     }
 
-    function saveRaceStartPoints(uint256 raceId, int256 points) external {
-        require(raceStartPassed[raceId][msg.sender] == false, "Already passed");
-        raceStartPassed[raceId][msg.sender] = true;
 
-        raceStartPoints[raceId][msg.sender] = points;
-    }
 
     function getRacesWithPagination(
         address user,
@@ -398,16 +401,51 @@ contract BlockSheep is Ownable {
     }
 
 
-    function changeTyres(string memory gameName, uint256 raceId, address user) public {
-        raceUpdatePenaltyPoints[raceId]["CHANGE_TYRES"][user] += 2 * BPS;
-        raceUpdatePenaltyPointsEnabled[raceId]["CHANGE_TYRES"] = true;
-        IGameInterface(targetContracts[gameName]).changeTyres(raceId, user);
+    function changeTyres(string memory raceUpdateScreen, string memory nextGameScreen, uint256 raceId) public {
+        string memory event_name = string(abi.encodePacked("CHANGE_TYRES_", raceUpdateScreen));
+        require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
+
+        raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = 2 * BPS;
+        raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
+        raceUpdateBonusMalusPointsEnabled[raceId][event_name] = true;
+        IGameInterface(targetContracts[nextGameScreen]).changeTyres(raceId, msg.sender);
     }
 
-    function jumpAnObstacle(string memory gameName, uint256 raceId, address user) public {
-        string memory event_name = string(abi.encodePacked("OBSTACLE_", gameName));
-        raceUpdatePenaltyPoints[raceId][event_name][user] = -1 * BPS;
-        raceUpdatePenaltyPointsEnabled[raceId][event_name] = true;
+    function jumpAnObstacle(string memory raceUpdateScreen, uint256 raceId) public {
+        string memory event_name = string(abi.encodePacked("OBSTACLE_", raceUpdateScreen));
+        require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
+
+        raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = 1 * BPS;
+        raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
+        raceUpdateBonusMalusPointsEnabled[raceId][event_name] = true;
+    }
+
+    function sprint(string memory raceUpdateScreen, uint256 raceId) public {
+        string memory event_name = string(abi.encodePacked("SPRINT_", raceUpdateScreen));
+        require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
+
+        raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = 3 * BPS;
+        raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
+        raceUpdateBonusMalusPointsEnabled[raceId][event_name] = true;
+    }
+
+    function beginRace(uint256 raceId, int256 points) external {
+        string memory event_name = "RACE_START";
+        require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
+
+        raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = points * BPS;
+        raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
+        raceUpdateBonusMalusPointsEnabled[raceId][event_name] = true;
+    }
+
+    function saveBonus(uint256 raceId, int256 pointsWithBPS, string memory gameScreen) external {
+        string memory event_name = string(abi.encodePacked("BONUS_", gameScreen));
+
+        require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
+
+        raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = pointsWithBPS;
+        raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
+        raceUpdateBonusMalusPointsEnabled[raceId][event_name] = true;
     }
 
 
