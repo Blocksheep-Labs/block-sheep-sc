@@ -76,7 +76,8 @@ contract BlockSheep is Ownable {
         userHasAdminAccess[owner] = true;
     }
 
-    function deposit(uint256 amount, address user) external onlyOwner {
+    function deposit(uint256 amount, address user) external {
+        require(userHasAdminAccess[msg.sender] == true || msg.sender == owner(), "Access denied");
         require(amount > 0, "Amount to buy must be greater than zero");
         balances[user] += amount;
 
@@ -101,7 +102,7 @@ contract BlockSheep is Ownable {
         RaceInfo memory raceInfoById = getRace(raceId, msg.sender);
         address[] memory users = raceInfoById.registeredUsers;
         uint256 userCount = users.length;
-        require(userCount > 1, "Not enough users in race");
+        require(userCount >= 1, "Not enough users in race");
 
         // Gather user + score pairs
         address[] memory sortedUsers = new address[](userCount);
@@ -139,24 +140,91 @@ contract BlockSheep is Ownable {
             }
         }
 
-        require(userScore > 0, "No refund for 0 points");
-
         uint256 topK = userCount / 2;
-        require(rank < topK, "Only top half get refund");
 
-        // Calculate bonus, linear decay from COST to 0 across topK ranks
-        uint256 bonus = 0;
-        if (topK > 1) {
-            bonus = race.entryPrice * (topK - rank) / (topK - 1); // full bonus at top, 0 at lowest eligible
-        } else {
-            bonus = race.entryPrice; // edge case: only 1 top user
+        // Only top half get refund
+        if (rank < topK) {
+            // Calculate bonus, linear decay from COST to 0 across topK ranks
+            uint256 bonus = 0;
+            if (topK > 1) {
+                bonus = race.entryPrice * (topK - rank) / (topK - 1); // full bonus at top, 0 at lowest eligible
+            } else {
+                bonus = race.entryPrice; // edge case: only 1 top user
+            }
+
+            uint256 refundAmount = race.entryPrice + bonus;
+            balances[msg.sender] += refundAmount;
         }
 
-        uint256 refundAmount = race.entryPrice + bonus;
-        balances[msg.sender] += refundAmount;
         race.refunded[msg.sender] = true;
     }
 
+    function possibleRefundingAmount(uint256 raceId, address user) public view returns(uint256 refundAmount) {
+        refundAmount = 0;
+        Race storage race = races[raceId];
+        if (
+            race.endAt > block.timestamp ||
+            !race.playerRegistered[user] ||
+            race.refunded[user]
+        ) {
+            return 0;
+        }
+
+        RaceInfo memory raceInfoById = getRace(raceId, user);
+        address[] memory users = raceInfoById.registeredUsers;
+        uint256 userCount = users.length;
+
+        // Gather user + score pairs
+        address[] memory sortedUsers = new address[](userCount);
+        int256[] memory scores = new int256[](userCount);
+        for (uint256 i = 0; i < userCount; i++) {
+            sortedUsers[i] = users[i];
+            scores[i] = getScoreAtRaceOfUser(raceId, users[i]);
+        }
+
+        // Sort by score descending using simple bubble sort (for clarity)
+        for (uint256 i = 0; i < userCount - 1; i++) {
+            for (uint256 j = i + 1; j < userCount; j++) {
+                if (scores[j] > scores[i]) {
+                    // Swap scores
+                    int256 tempScore = scores[i];
+                    scores[i] = scores[j];
+                    scores[j] = tempScore;
+
+                    // Swap users to keep alignment
+                    address tempUser = sortedUsers[i];
+                    sortedUsers[i] = sortedUsers[j];
+                    sortedUsers[j] = tempUser;
+                }
+            }
+        }
+
+        // Determine position of msg.sender
+        uint256 rank = userCount;
+        int256 userScore = 0;
+        for (uint256 i = 0; i < userCount; i++) {
+            if (sortedUsers[i] == user) {
+                rank = i;
+                userScore = scores[i];
+                break;
+            }
+        }
+
+        uint256 topK = userCount / 2;
+
+        // Only top half get refund
+        if (rank < topK) {
+            // Calculate bonus, linear decay from COST to 0 across topK ranks
+            uint256 bonus = 0;
+            if (topK > 1) {
+                bonus = race.entryPrice * (topK - rank) / (topK - 1); // full bonus at top, 0 at lowest eligible
+            } else {
+                bonus = race.entryPrice; // edge case: only 1 top user
+            }
+
+            refundAmount = race.entryPrice + bonus;
+        }
+    }
 
 
     function register(uint256 raceId, address user) external {
