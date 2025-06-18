@@ -5,7 +5,7 @@ import { IGameInterface } from "./IGameInterface.sol";
 
 
 contract GameUnderdog is IGameInterface {
-    int256 private constant BPS = 1000;
+    int256 public constant BPS = 1000;
 
     // User choices by raceId, user address, and questionIndex
     mapping(uint256 => mapping(address => mapping(uint8 => uint256))) private UNDERDOG_usersChoices;
@@ -87,6 +87,23 @@ contract GameUnderdog is IGameInterface {
         for (uint256 i = 0; i < uniquePlayerCount; i++) {
             players[i] = tempPlayers[i];
             points[i] = tempPoints[i];
+        }
+
+        // Sort in descending order of points using simple bubble sort
+        for (uint256 i = 0; i < uniquePlayerCount; i++) {
+            for (uint256 j = i + 1; j < uniquePlayerCount; j++) {
+                if (points[j] > points[i]) {
+                    // Swap points
+                    int256 tempPoint = points[i];
+                    points[i] = points[j];
+                    points[j] = tempPoint;
+
+                    // Swap corresponding players
+                    address tempPlayer = players[i];
+                    players[i] = players[j];
+                    players[j] = tempPlayer;
+                }
+            }
         }
 
         return (players, points);

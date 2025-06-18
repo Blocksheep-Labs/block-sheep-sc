@@ -21,6 +21,4 @@ interface IGameInterface {
     function initRace(uint256 raceid, bytes memory data) external;
 
     function changeTyres(uint256 raceId, address user) external;
-
-    function jumpAnObstacle(uint256 raceId, address user) external;
 }

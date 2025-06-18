@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import { IGameInterface } from "./IGameInterface.sol";
 
 contract GameRabbitHole is IGameInterface {
-    int256 private constant BPS = 1000;
+    int256 public constant BPS = 1000;
     // user chioces by gameId
     //        raceId           roundId           user          fuelSubmitted
     mapping(uint256 => mapping(uint256 => mapping(address => uint256))) private RABBITHOLE_usersChoices;

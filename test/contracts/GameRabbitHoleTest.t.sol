@@ -74,7 +74,7 @@ contract GameRabbitHoleTest is Test {
         game.distribute(raceId, abi.encode(player3));
 
         int256 pointsPlayer3 = game.getPoints(player3, raceId);
-        assertEq(pointsPlayer3, 1);
+        assertEq(pointsPlayer3, 1 * game.BPS());
 
         roundIndex = 1;
 
@@ -94,13 +94,13 @@ contract GameRabbitHoleTest is Test {
         // player 2 finishes game and should get 2 points
         game.distribute(raceId, abi.encode(player2));
         int256 pointsPlayer2 = game.getPoints(player2, raceId);
-        assertEq(pointsPlayer2, 2);
+        assertEq(pointsPlayer2, 2 * game.BPS());
 
 
         // player 1 finishes game and should get 3 points
         game.distribute(raceId, abi.encode(player1));
         int256 pointsPlayer1 = game.getPoints(player1, raceId);
-        assertEq(pointsPlayer1, 3);
+        assertEq(pointsPlayer1, 3 * game.BPS());
     }
 
     function testGetUserChoices() public {

@@ -82,8 +82,8 @@ contract GameBullrunTest is Test {
         int256 alicePoints = game.getPoints(alice, raceId);
         int256 bobPoints = game.getPoints(bob, raceId);
         
-        assertEq(alicePoints, 2); // Based on the points matrix [0][1] = -1
-        assertEq(bobPoints, 3);    // Based on the points matrix [1][0] = 1
+        assertEq(alicePoints, 2 * game.BPS()); // Based on the points matrix [0][1] = -1
+        assertEq(bobPoints, 3 * game.BPS());    // Based on the points matrix [1][0] = 1
     }
 
     function testDistributeWhenOnePlayerDidNotMove() public {
@@ -99,8 +99,8 @@ contract GameBullrunTest is Test {
         int256 alicePoints = game.getPoints(alice, raceId);
         int256 bobPoints = game.getPoints(bob, raceId);
         
-        assertEq(alicePoints, 3);  // Alice should get +1 for making a move
-        assertEq(bobPoints, 2);   // Bob should get -1 for not making a move
+        assertEq(alicePoints, 3 * game.BPS());  // Alice should get +1 for making a move
+        assertEq(bobPoints, 2 * game.BPS());   // Bob should get -1 for not making a move
     }
 
     function testGetWinner() public {

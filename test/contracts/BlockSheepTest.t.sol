@@ -15,7 +15,6 @@ import { GameUnderdog } from "../../src/GameUnderdog.sol";
 
 contract BlockSheepTest is Test {
     BlockSheep bls;
-    MockUSDC underlyingToken;
 
     address owner = address(0x1);
     address user1 = address(0x2);
@@ -31,18 +30,10 @@ contract BlockSheepTest is Test {
     function setUp() public {
         vm.prank(owner);
 
-        underlyingToken = new MockUSDC();
-        decimals = underlyingToken.decimals();
-
         bls = new BlockSheep(
-            address(underlyingToken),
-            owner,
-            10 * 10 ** decimals
+            owner
         );
 
-        
-        underlyingToken.mint(user1, 10 * 10 ** decimals, false);
-        underlyingToken.mint(user2, 10 * 10 ** decimals, false); 
 
 
         // register games
@@ -78,30 +69,26 @@ contract BlockSheepTest is Test {
 
     function testDeposit() public {
         uint256 amountToDeposit = 10 * 10 ** decimals;
-        
-        vm.prank(user1);
-        underlyingToken.approve(address(bls), amountToDeposit);
 
-        vm.prank(user1);
-        bls.deposit(amountToDeposit);
+        vm.startPrank(owner);
+        bls.deposit(amountToDeposit, user1);
+        vm.stopPrank();
 
         assertEq(bls.balances(user1), amountToDeposit);
-        assertEq(underlyingToken.balanceOf(user1), 0);
     }
 
     function testWithdraw() public {
         uint256 amount = 10 * 10 ** decimals;
 
+        vm.startPrank(owner);
+        bls.deposit(amount, user1);
+        vm.stopPrank();
+
         vm.startPrank(user1);
-
-        underlyingToken.approve(address(bls), amount);
-        bls.deposit(amount);
         bls.withdraw(amount);
-
         vm.stopPrank();
 
         assertEq(bls.balances(user1), 0);
-        assertEq(underlyingToken.balanceOf(user1), amount);
     }
 
 
@@ -109,9 +96,8 @@ contract BlockSheepTest is Test {
         uint256 amount = 10 * 10 ** decimals;
 
         // deposit money
-        vm.startPrank(user1);
-        underlyingToken.approve(address(bls), amount);
-        bls.deposit(amount);
+        vm.startPrank(owner);
+        bls.deposit(amount, user1);
         vm.stopPrank();
 
         // grant admin role
@@ -122,8 +108,9 @@ contract BlockSheepTest is Test {
         assertTrue(bls.userHasAdminAccess(user1));
 
         // add the race finally :)
-        vm.startPrank(user1);
+        vm.startPrank(owner);
         bls.addRace(
+            0,
             1, 
             2, 
             0,
@@ -132,8 +119,9 @@ contract BlockSheepTest is Test {
             abi.encode(questions) // for underdog init
         );
 
+
         // register
-        bls.register(0); // 0 - is the id of the first race
+        bls.register(0, user1); // 0 - is the id of the first race
         vm.stopPrank();
 
         // verify the user registration result
@@ -157,18 +145,15 @@ contract BlockSheepTest is Test {
         uint256 amount = 10 * 10 ** decimals;
 
         // deposit money
-        vm.startPrank(user1);
-        underlyingToken.approve(address(bls), amount);
-        bls.deposit(amount);
-        vm.stopPrank();
+        vm.startPrank(owner);
+        bls.deposit(amount, user1);
 
         // grant admin role
-        vm.prank(owner);
         bls.setAdminRights(user1, true);
 
         // add the race finally :)
-        vm.startPrank(user1);
         bls.addRace(
+            0,
             1, 
             2, 
             0,
@@ -177,28 +162,29 @@ contract BlockSheepTest is Test {
             abi.encode(questions) // for underdog init
         );
 
-        // register
-        bls.register(0); // 0 - is the id of the first race
+        // register user
+        bls.register(0, user1); // 0 - is the id of the first race
 
         console.log(block.timestamp);
         vm.warp(block.timestamp + 2 hours);
         console.log(block.timestamp);
 
-        bls.refundBalance(amount, 0); // 0 - is the id of the first race
+        vm.stopPrank();
 
+        vm.startPrank(user1);
+        bls.refundWinningBalance(0); // 0 - is the id of the first race
         vm.stopPrank();
 
         assertEq(bls.balances(user1), amount);
     }
 
 
-    function testFailingRefund() public {
+    function test_Revert_When_RefundingOnNotFinishedRace() public {
         uint256 amount = 10 * 10 ** decimals;
 
         // deposit money
-        vm.startPrank(user1);
-        underlyingToken.approve(address(bls), amount);
-        bls.deposit(amount);
+        vm.startPrank(owner);
+        bls.deposit(amount, user1);
         vm.stopPrank();
 
         // grant admin role
@@ -208,6 +194,7 @@ contract BlockSheepTest is Test {
         // add the race finally :)
         vm.startPrank(user1);
         bls.addRace(
+            0,
             1, 
             2, 
             0,
@@ -215,12 +202,15 @@ contract BlockSheepTest is Test {
             abi.encode(points), // for bullrun init
             abi.encode(questions) // for underdog init
         );
+        vm.stopPrank();
+
 
         // register
-        bls.register(0); // 0 - is the id of the first race
+        vm.startPrank(owner);
+        bls.register(0, user1); // 0 - is the id of the first race
 
-        // vm.expectRevert();
-        bls.refundBalance(amount, 0); // 0 - is the id of the first race
+        vm.expectRevert();
+        bls.refundWinningBalance(0); // 0 - is the id of the first race
         
         vm.stopPrank();
     }
