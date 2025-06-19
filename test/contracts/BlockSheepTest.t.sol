@@ -67,39 +67,8 @@ contract BlockSheepTest is Test {
         questions[0].imgUrl = "url1";
     }
 
-    function testDeposit() public {
-        uint256 amountToDeposit = 10 * 10 ** decimals;
-
-        vm.startPrank(owner);
-        bls.deposit(amountToDeposit, user1);
-        vm.stopPrank();
-
-        assertEq(bls.balances(user1), amountToDeposit);
-    }
-
-    function testWithdraw() public {
-        uint256 amount = 10 * 10 ** decimals;
-
-        vm.startPrank(owner);
-        bls.deposit(amount, user1);
-        vm.stopPrank();
-
-        vm.startPrank(user1);
-        bls.withdraw(amount);
-        vm.stopPrank();
-
-        assertEq(bls.balances(user1), 0);
-    }
-
 
     function testRegisterAndRaceCreation() public {
-        uint256 amount = 10 * 10 ** decimals;
-
-        // deposit money
-        vm.startPrank(owner);
-        bls.deposit(amount, user1);
-        vm.stopPrank();
-
         // grant admin role
         vm.prank(owner);
         bls.setAdminRights(user1, true);
@@ -129,64 +98,7 @@ contract BlockSheepTest is Test {
     }
 
 
-    function testInsufficientBalanceOnWithdraw() public {
-        vm.startPrank(user1);
-
-        // user has no balance, expecting a revert
-        vm.expectRevert();
-
-        bls.withdraw(10 * 10 ** decimals);
-
-        vm.stopPrank();
-    }
-
-
-    function testSuccesfulRefund() public {
-        uint256 amount = 10 * 10 ** decimals;
-
-        // deposit money
-        vm.startPrank(owner);
-        bls.deposit(amount, user1);
-
-        // grant admin role
-        bls.setAdminRights(user1, true);
-
-        // add the race finally :)
-        bls.addRace(
-            0,
-            1, 
-            2, 
-            0,
-            screens, 
-            abi.encode(points), // for bullrun init
-            abi.encode(questions) // for underdog init
-        );
-
-        // register user
-        bls.register(0, user1); // 0 - is the id of the first race
-
-        console.log(block.timestamp);
-        vm.warp(block.timestamp + 2 hours);
-        console.log(block.timestamp);
-
-        vm.stopPrank();
-
-        vm.startPrank(user1);
-        bls.refundWinningBalance(0); // 0 - is the id of the first race
-        vm.stopPrank();
-
-        assertEq(bls.balances(user1), amount);
-    }
-
-
     function test_Revert_When_RefundingOnNotFinishedRace() public {
-        uint256 amount = 10 * 10 ** decimals;
-
-        // deposit money
-        vm.startPrank(owner);
-        bls.deposit(amount, user1);
-        vm.stopPrank();
-
         // grant admin role
         vm.prank(owner);
         bls.setAdminRights(user1, true);

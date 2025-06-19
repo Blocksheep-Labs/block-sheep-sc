@@ -3,7 +3,6 @@ pragma solidity ^0.8.20;
 
 import { IGameInterface } from "./IGameInterface.sol";
 
-
 contract GameWhaleteeth is IGameInterface {
   int256 public constant BPS = 1000;
 
@@ -18,7 +17,7 @@ contract GameWhaleteeth is IGameInterface {
     int256 points = WHALETEETH_points[raceId][user];
 
     if (WHALETEETH_changedTyresBeforeTheGame[raceId][user]) {
-        points = points * 25 / 10;
+      points = points * 25 / 10;
     }
 
     return points;
@@ -40,21 +39,21 @@ contract GameWhaleteeth is IGameInterface {
 
     address[] memory sortedAddresses = new address[](count);
     int256[] memory sortedPoints = new int256[](count);
-    
+
 
     for (uint256 i = 0; i < count; i++) {
-        sortedAddresses[i] = participants[i];
-        sortedPoints[i] = getPoints(participants[i], raceId);
+      sortedAddresses[i] = participants[i];
+      sortedPoints[i] = getPoints(participants[i], raceId);
     }
 
 
     for (uint256 i = 0; i < count; i++) {
-        for (uint256 j = i + 1; j < count; j++) {
-            if (sortedPoints[j] > sortedPoints[i]) {
-                (sortedPoints[i], sortedPoints[j]) = (sortedPoints[j], sortedPoints[i]);
-                (sortedAddresses[i], sortedAddresses[j]) = (sortedAddresses[j], sortedAddresses[i]);
-            }
+      for (uint256 j = i + 1; j < count; j++) {
+        if (sortedPoints[j] > sortedPoints[i]) {
+          (sortedPoints[i], sortedPoints[j]) = (sortedPoints[j], sortedPoints[i]);
+          (sortedAddresses[i], sortedAddresses[j]) = (sortedAddresses[j], sortedAddresses[i]);
         }
+      }
     }
 
     return (sortedAddresses, sortedPoints);
@@ -68,21 +67,25 @@ contract GameWhaleteeth is IGameInterface {
     return;
   }
 
-  function distribute(uint256 raceId, bytes memory data) external override {
+  function distribute(uint256 raceId, bytes memory data) external {
+    if (WHALETEETH_distributed[raceId]) {
+      return;
+    }
+
     (address[] memory players, int256[] memory points) = abi.decode(data, (address[], int256[]));
 
     require(players.length == points.length, "Mismatched data length");
 
     for (uint256 i = 0; i < players.length; i++) {
-        WHALETEETH_points[raceId][players[i]] = points[i];
-        WHALETEETH_gameParticipants[raceId].push(players[i]); // Добавляем игрока в participants
+      WHALETEETH_points[raceId][players[i]] = points[i] * BPS;
+      WHALETEETH_gameParticipants[raceId].push(players[i]); // Добавляем игрока в participants
     }
 
     WHALETEETH_distributed[raceId] = true;
-}
+  }
 
   function initRace(uint256 raceid, bytes memory data) external {
-      // no need additional logic to init race
+    // no need additional logic to init race
   }
 
   function changeTyres(uint256 raceId, address user) public {

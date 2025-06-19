@@ -33,8 +33,8 @@ contract GameWhaleteethTest is Test {
         
         game.distribute(raceId, data);
         
-        assertEq(game.getPoints(player1, raceId), 100);
-        assertEq(game.getPoints(player2, raceId), 200);
+        assertEq(game.getPoints(player1, raceId), 100 * game.BPS());
+        assertEq(game.getPoints(player2, raceId), 200 * game.BPS());
     }
 
     function testChangeTyresEffect() public {
@@ -47,11 +47,11 @@ contract GameWhaleteethTest is Test {
         bytes memory data = abi.encode(players, points);
         game.distribute(raceId, data);
         
-        assertEq(game.getPoints(player1, raceId), 100);
+        assertEq(game.getPoints(player1, raceId), 100 * game.BPS());
         
         game.changeTyres(raceId, player1);
         
-        assertEq(game.getPoints(player1, raceId), 250);
+        assertEq(game.getPoints(player1, raceId), 250 * game.BPS());
         assertTrue(game.WHALETEETH_changedTyresBeforeTheGame(raceId, player1));
     }
 
@@ -80,13 +80,13 @@ contract GameWhaleteethTest is Test {
         assertEq(winnerPoints.length, 3);
         
         assertEq(winnersAfter[0], player3);
-        assertEq(winnerPoints[0], 500);
+        assertEq(winnerPoints[0], 500 * game.BPS());
         
         assertEq(winnersAfter[1], player1);
-        assertEq(winnerPoints[1], 300);
+        assertEq(winnerPoints[1], 300 * game.BPS());
         
         assertEq(winnersAfter[2], player2);
-        assertEq(winnerPoints[2], 100);
+        assertEq(winnerPoints[2], 100 * game.BPS());
     }
 
     function testDistributeWithMismatchedArrays() public {

@@ -13,8 +13,6 @@ contract BlockSheep is Ownable {
     int256 private constant BPS = 1000;
     uint64 private constant MIN_SECONDS_BEFORE_START_RACE = 5 minutes;
 
-    mapping(address => uint256) public balances;
-
     mapping(uint256 => Race) public races;
 
     uint256 public nextRaceId;
@@ -31,6 +29,10 @@ contract BlockSheep is Ownable {
     mapping(uint256 => mapping(string => mapping(address => int256))) public raceUpdateBonusMalusPoints;
     mapping(uint256 => mapping(string => mapping(address => bool))) public raceUpdateBonusMalusPointsOfUser;
     mapping(uint256 => mapping(string => bool)) public raceUpdateBonusMalusPointsEnabled;
+
+    // refunds / usdc withdrawals
+    mapping(uint256 => mapping(address => uint256)) public raceWithdrawals;
+
 
 
     enum RaceStatus {
@@ -67,8 +69,7 @@ contract BlockSheep is Ownable {
     }
 
     event Registered(address user, uint256 amount);
-    event Deposited(address user, uint256 amount, uint256 balance);
-    event Withdrawed(address user, uint256 amount, uint256 balance);
+    event Withdrawed(address user, uint256 amount);
 
     constructor(
         address owner
@@ -76,26 +77,9 @@ contract BlockSheep is Ownable {
         userHasAdminAccess[owner] = true;
     }
 
-    function deposit(uint256 amount, address user) external {
-        require(userHasAdminAccess[msg.sender] == true || msg.sender == owner(), "Access denied");
-        require(amount > 0, "Amount to buy must be greater than zero");
-        balances[user] += amount;
-
-        emit Deposited(user, amount, balances[user]);
-    }
-
-    function withdraw(uint256 amount) external {
-        require(amount > 0, "Amount must be greater than zero");
-        require(balances[msg.sender] >= amount, "Insufficient balance");
-        balances[msg.sender] -= amount;
-
-        emit Withdrawed(msg.sender, amount, balances[msg.sender]);
-    }
-
 
     function refundWinningBalance(uint256 raceId) external {
         Race storage race = races[raceId];
-        require(race.endAt < block.timestamp, "Race is not finished");
         require(race.playerRegistered[msg.sender], "Not registered");
         require(!race.refunded[msg.sender], "Already refunded");
 
@@ -103,6 +87,9 @@ contract BlockSheep is Ownable {
         address[] memory users = raceInfoById.registeredUsers;
         uint256 userCount = users.length;
         require(userCount >= 1, "Not enough users in race");
+
+        // make the game completed
+        race.endAt = uint64(block.timestamp);
 
         // Gather user + score pairs
         address[] memory sortedUsers = new address[](userCount);
@@ -153,7 +140,10 @@ contract BlockSheep is Ownable {
             }
 
             uint256 refundAmount = race.entryPrice + bonus;
-            balances[msg.sender] += refundAmount;
+
+            raceWithdrawals[raceId][msg.sender] = refundAmount;
+
+            emit Withdrawed(msg.sender, refundAmount);
         }
 
         race.refunded[msg.sender] = true;
@@ -235,9 +225,7 @@ contract BlockSheep is Ownable {
         require(block.timestamp < race.endAt, "Race is finished");
         require(race.playerRegistered[user] == false, "Already registered");
         require(race.registeredUsers.length < race.numOfPlayersRequired, "Race is full");
-        require(balances[user] >= race.entryPrice, "Not enough balance");
 
-        balances[user] -= race.entryPrice;
         race.playerRegistered[user] = true;
         race.registeredUsers.push(user);
 
