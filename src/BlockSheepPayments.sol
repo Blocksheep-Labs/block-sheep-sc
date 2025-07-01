@@ -47,7 +47,7 @@ contract BlockSheepPayments is Ownable {
     ) external onlyOwner {
         require(amount > 0, "Amount to send must be greater than zero");
 
-        UNDERLYING.safeTransferFrom(address(this), to, amount);
+        UNDERLYING.safeTransfer(to, amount);
 
         emit PaymentSend(to, amount);
     }

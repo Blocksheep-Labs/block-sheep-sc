@@ -365,6 +365,15 @@ contract BlockSheep is Ownable {
             if (raceUpdateBonusMalusPointsEnabled[raceId][bonusKey]) {
                 score += raceUpdateBonusMalusPoints[raceId][bonusKey][user];
             }
+
+            // 6. Jump into boat at whaleteeth intro
+            string memory jumpIntoBoatKey = string(abi.encodePacked("JUMP_INTO_BOAT"));
+            if (
+                raceUpdateBonusMalusPointsEnabled[raceId][jumpIntoBoatKey] &&
+                !raceUpdateBonusMalusPointsOfUser[raceId][jumpIntoBoatKey][user]
+            ) {
+                score -= 3 * BPS;
+            }
         }
 
         // Add race start points (not tied to screen)
@@ -472,6 +481,14 @@ contract BlockSheep is Ownable {
         require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
 
         raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = 1 * BPS;
+        raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
+        raceUpdateBonusMalusPointsEnabled[raceId][event_name] = true;
+    }
+
+    function jumpIntoBoat(uint256 raceId) public {
+        string memory event_name = string(abi.encodePacked("JUMP_INTO_BOAT"));
+        require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
+
         raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
         raceUpdateBonusMalusPointsEnabled[raceId][event_name] = true;
     }
