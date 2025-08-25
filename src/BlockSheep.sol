@@ -69,6 +69,7 @@ contract BlockSheep is Ownable {
 
     event Registered(address user, uint256 amount);
     event Withdrawed(address user, uint256 amount);
+    event RaceCreated(); // TODO: update
 
     constructor(
         address owner
@@ -254,7 +255,9 @@ contract BlockSheep is Ownable {
         bytes calldata initStateForBullrun, //int256[3][3] calldata points,
         bytes calldata initStateForUnderdog //QuestionInfo[] calldata questions
     ) external {
-        require(userHasAdminAccess[msg.sender] == true || msg.sender == owner(), "Access denied");
+        // if (entryPrice > 0) {
+        //    require(userHasAdminAccess[msg.sender] == true || msg.sender == owner(), "Access denied");
+        // }
 
         uint64 endAt = uint64(block.timestamp + (hoursBeforeFinish * 1 hours));
         require(endAt > block.timestamp + MIN_SECONDS_BEFORE_START_RACE, "Invalid timestamp");
@@ -467,7 +470,7 @@ contract BlockSheep is Ownable {
         require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
 
         if (!isJumped) {
-            raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = -1 * BPS;
+            raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = -300;
         }
         raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
     }
@@ -477,7 +480,7 @@ contract BlockSheep is Ownable {
         require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
 
         if (!isJumped) {
-            raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = -3 * BPS;
+            raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = -1 * BPS;
         }
 
         raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
@@ -491,11 +494,11 @@ contract BlockSheep is Ownable {
         raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
     }
 
-    function beginRace(uint256 raceId, int256 points) external {
+    function beginRace(uint256 raceId, int256 pointsWithBPS) external {
         string memory event_name = "RACE_START";
         require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
 
-        raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = points * BPS;
+        raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = pointsWithBPS;
         raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
     }
 
