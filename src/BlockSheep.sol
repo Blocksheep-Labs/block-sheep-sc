@@ -131,18 +131,34 @@ contract BlockSheep is Ownable {
 
         // Only top half get refund
         if (rank < topK) {
-            // Calculate bonus, linear decay from COST to 0 across topK ranks
-            uint256 bonus = 0;
-            if (topK > 1) {
-                bonus = race.entryPrice * (topK - rank) / (topK - 1); // full bonus at top, 0 at lowest eligible
-            } else {
-                bonus = race.entryPrice; // edge case: only 1 top user
+            // --- Prize distribution ---
+            uint256 prizePool = race.entryPrice * userCount;
+
+            uint256 baseRefundTotal = race.entryPrice * topK;
+            uint256 bonusPool = prizePool - baseRefundTotal;
+
+            uint256 totalWeight = (topK * (topK + 1)) / 2; // sum 1..topK
+            uint256 weight = topK - rank;
+
+            // Base refund: always entry price
+            uint256 refundAmount = race.entryPrice;
+
+            // Proportional bonus
+            uint256 bonus = (bonusPool * weight) / totalWeight;
+
+            // Handle remainder: assign to 1st place
+            if (rank == 0) {
+                uint256 distributed = 0;
+                for (uint256 i = 0; i < topK; i++) {
+                    distributed += (bonusPool * (topK - i)) / totalWeight;
+                }
+                uint256 remainder = bonusPool - distributed;
+                bonus += remainder;
             }
 
-            uint256 refundAmount = race.entryPrice + bonus;
+            refundAmount += bonus;
 
             raceWithdrawals[raceId][msg.sender] = refundAmount;
-
             emit Withdrawed(msg.sender, refundAmount);
         }
 
@@ -204,15 +220,32 @@ contract BlockSheep is Ownable {
 
         // Only top half get refund
         if (rank < topK) {
-            // Calculate bonus, linear decay from COST to 0 across topK ranks
-            uint256 bonus = 0;
-            if (topK > 1) {
-                bonus = race.entryPrice * (topK - rank) / (topK - 1); // full bonus at top, 0 at lowest eligible
-            } else {
-                bonus = race.entryPrice; // edge case: only 1 top user
+            // --- Prize distribution ---
+            uint256 prizePool = race.entryPrice * userCount;
+
+            uint256 baseRefundTotal = race.entryPrice * topK;
+            uint256 bonusPool = prizePool - baseRefundTotal;
+
+            uint256 totalWeight = (topK * (topK + 1)) / 2; // sum 1..topK
+            uint256 weight = topK - rank;
+
+            // Base refund: always entry price
+            refundAmount = race.entryPrice;
+
+            // Proportional bonus
+            uint256 bonus = (bonusPool * weight) / totalWeight;
+
+            // Handle remainder: assign to 1st place
+            if (rank == 0) {
+                uint256 distributed = 0;
+                for (uint256 i = 0; i < topK; i++) {
+                    distributed += (bonusPool * (topK - i)) / totalWeight;
+                }
+                uint256 remainder = bonusPool - distributed;
+                bonus += remainder;
             }
 
-            refundAmount = race.entryPrice + bonus;
+            refundAmount += bonus;
         }
     }
 

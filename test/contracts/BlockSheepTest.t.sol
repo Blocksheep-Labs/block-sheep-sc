@@ -19,6 +19,11 @@ contract BlockSheepTest is Test {
     address owner = address(0x1);
     address user1 = address(0x2);
     address user2 = address(0x3);
+    address user3 = address(0x4);
+    address user4 = address(0x5);
+    address user5 = address(0x6);
+    address user6 = address(0x7);
+    address user7 = address(0x8);
 
     uint8 decimals = 1;
 
@@ -126,4 +131,74 @@ contract BlockSheepTest is Test {
         
         vm.stopPrank();
     }
+
+
+    function test_Distribute() public {
+        uint8[4] memory entryPrices = [uint8(10), uint8(5), uint8(2), uint8(1)];
+
+        for (uint256 e = 0; e < entryPrices.length; e++) {
+            uint256 entryPrice = entryPrices[e];
+
+            vm.startPrank(owner);
+
+            bls.addRace(
+                uint8(entryPrice),
+                1,
+                7,
+                0,
+                screens,
+                abi.encode(points),
+                abi.encode(questions)
+            );
+
+            uint256 raceId = e;
+
+            bls.register(raceId, user1);
+            bls.register(raceId, user2);
+            bls.register(raceId, user3);
+            bls.register(raceId, user4);
+            bls.register(raceId, user5);
+            bls.register(raceId, user6);
+            bls.register(raceId, user7);
+
+            vm.stopPrank();
+        }
+
+        vm.warp(block.timestamp + 1 hours);
+
+        for (uint256 e = 0; e < entryPrices.length; e++) {
+            uint256 entryPrice = entryPrices[e];
+
+            uint256 raceId = e;
+
+            if (entryPrice == 10) {
+                assertEq(bls.possibleRefundingAmount(raceId, user1), 31);
+                assertEq(bls.possibleRefundingAmount(raceId, user2), 23);
+                assertEq(bls.possibleRefundingAmount(raceId, user3), 16);
+                assertEq(bls.possibleRefundingAmount(raceId, user4), 0);
+            }
+
+            if (entryPrice == 5) {
+                assertEq(bls.possibleRefundingAmount(raceId, user1), 16);
+                assertEq(bls.possibleRefundingAmount(raceId, user2), 11);
+                assertEq(bls.possibleRefundingAmount(raceId, user3), 8);
+                assertEq(bls.possibleRefundingAmount(raceId, user4), 0);
+            }
+
+            if (entryPrice == 2) {
+                assertEq(bls.possibleRefundingAmount(raceId, user1), 7);
+                assertEq(bls.possibleRefundingAmount(raceId, user2), 4);
+                assertEq(bls.possibleRefundingAmount(raceId, user3), 3);
+                assertEq(bls.possibleRefundingAmount(raceId, user4), 0);
+            }
+
+            if (entryPrice == 1) {
+                assertEq(bls.possibleRefundingAmount(raceId, user1), 4);
+                assertEq(bls.possibleRefundingAmount(raceId, user2), 2);
+                assertEq(bls.possibleRefundingAmount(raceId, user3), 1);
+                assertEq(bls.possibleRefundingAmount(raceId, user4), 0);
+            }
+        }
+    }
+
 }
