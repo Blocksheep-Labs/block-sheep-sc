@@ -5,15 +5,16 @@ import "../src/BlockSheep.sol";
 import "../lib/forge-std/src/Script.sol";
 
 contract AddAdmin is Script {
-    BlockSheep internal blockSheep =
-        BlockSheep(0x04E479005685D866b10c0DeEC5C679f633d34140);
-
-    function run() external {
+    function run(address blockSheep, address newAdmin) external {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
 
-        blockSheep.setAdminRights(0xC5B7c26c237b55B33CCc6279A85Cd030d170C822, true);
+        BlockSheep bls = BlockSheep(blockSheep);
+        bls.setAdminRights(newAdmin, true);
 
         vm.stopBroadcast();
     }
 }
+
+//0xc662908Aa4d36899C8d82041a1255304391A8985
+//0x37938ef05d81CCd598Db71546A4BAC1Ad9B5C25E
