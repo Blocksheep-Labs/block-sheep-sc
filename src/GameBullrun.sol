@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import { IGameInterface } from "./IGameInterface.sol";
 
 contract GameBullrun is IGameInterface {
-    int256 public constant BPS = 1000;
+    int256 private constant BPS = 1000;
     // Struct to track user rooms
     struct BULLRUN_Room {
         uint256 userPerkIndex;

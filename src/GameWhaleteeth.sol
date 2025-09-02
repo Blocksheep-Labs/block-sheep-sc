@@ -68,9 +68,9 @@ contract GameWhaleteeth is IGameInterface {
   }
 
   function distribute(uint256 raceId, bytes memory data) external {
-    if (WHALETEETH_distributed[raceId]) {
-      return;
-    }
+    // if (WHALETEETH_distributed[raceId]) {
+    //    return;
+    // }
 
     (address[] memory players, int256[] memory points) = abi.decode(data, (address[], int256[]));
 

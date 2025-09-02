@@ -3,12 +3,14 @@ pragma solidity ^0.8.20;
 
 import "../lib/forge-std/src/Script.sol";
 
+import {BlockSheep} from "../src/BlockSheep.sol";
+
 // games
 import {GameBullrun} from "../src/GameBullrun.sol";
 import {GameRabbitHole} from "../src/GameRabbitHole.sol";
 import {GameUnderdog} from "../src/GameUnderdog.sol";
 import {GameWhaleteeth} from "../src/GameWhaleteeth.sol";
-import {BlockSheep} from "../src/BlockSheep.sol";
+
 
 contract AddGamesToBlockSheep is Script {
     function run(
