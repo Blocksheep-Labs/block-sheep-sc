@@ -28,7 +28,7 @@ contract GameRabbitHoleTest is Test {
         vm.prank(player1);
         address[] memory leavedPlayers = new address[](0);
 
-        bytes memory data = abi.encode(100, 50, roundIndex, player1, leavedPlayers);
+        bytes memory data = abi.encode(100, 50, roundIndex, player1, leavedPlayers, leavedPlayers);
         game.makeMove(raceId, data);
         
         // Check that player1's choice is recorded
@@ -40,7 +40,7 @@ contract GameRabbitHoleTest is Test {
     function testGetPoints() public {
         // Player 1 makes a move
         address[] memory leavedPlayers = new address[](0);
-        bytes memory data = abi.encode(100, 50, roundIndex, player1, leavedPlayers);
+        bytes memory data = abi.encode(100, 50, roundIndex, player1, leavedPlayers, leavedPlayers);
         game.makeMove(raceId, data);
         
         // Check points for player1
@@ -54,19 +54,19 @@ contract GameRabbitHoleTest is Test {
 
         // player1 makes move
         address[] memory leavedPlayers1 = new address[](0);
-        bytes memory data1 = abi.encode(3, 7, roundIndex, player1, leavedPlayers1);
+        bytes memory data1 = abi.encode(3, 7, roundIndex, player1, leavedPlayers1, leavedPlayers1);
         vm.prank(player1);
         game.makeMove(raceId, data1);
         
         // player2 makes move
         address[] memory leavedPlayers2 = new address[](0);
-        bytes memory data2 = abi.encode(2, 8, roundIndex, player2, leavedPlayers2);
+        bytes memory data2 = abi.encode(2, 8, roundIndex, player2, leavedPlayers2, leavedPlayers2);
         vm.prank(player2);
         game.makeMove(raceId, data2);
 
         // player3 makes move
         address[] memory leavedPlayers3 = new address[](0);
-        bytes memory data3 = abi.encode(0, 10, roundIndex, player3, leavedPlayers3);
+        bytes memory data3 = abi.encode(0, 10, roundIndex, player3, leavedPlayers3, leavedPlayers3);
         vm.prank(player3);
         game.makeMove(raceId, data3);
 
@@ -81,13 +81,13 @@ contract GameRabbitHoleTest is Test {
 
         // player1 makes move
         address[] memory leavedPlayers4 = new address[](0);
-        bytes memory data4 = abi.encode(3, 4, roundIndex, player1, leavedPlayers4);
+        bytes memory data4 = abi.encode(3, 4, roundIndex, player1, leavedPlayers4, leavedPlayers4);
         vm.prank(player1);
         game.makeMove(raceId, data4);
         
         // player2 makes move
         address[] memory leavedPlayers5 = new address[](0);
-        bytes memory data5 = abi.encode(2, 6, roundIndex, player2, leavedPlayers5);
+        bytes memory data5 = abi.encode(2, 6, roundIndex, player2, leavedPlayers5, leavedPlayers5);
         vm.prank(player2);
         game.makeMove(raceId, data5);
 
@@ -108,7 +108,7 @@ contract GameRabbitHoleTest is Test {
         address[] memory leavedPlayers = new address[](0);
 
         vm.prank(player1);
-        bytes memory data = abi.encode(100, 50, roundIndex, player1, leavedPlayers);
+        bytes memory data = abi.encode(100, 50, roundIndex, player1, leavedPlayers, leavedPlayers);
         game.makeMove(raceId, data);
         
         // Check user choices

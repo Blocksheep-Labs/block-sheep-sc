@@ -5,7 +5,7 @@ import { IGameInterface } from "./IGameInterface.sol";
 
 
 contract GameUnderdog is IGameInterface {
-    int256 private constant BPS = 1000;
+    int256 public constant BPS = 1000;
 
     // User choices by raceId, user address, and questionIndex
     mapping(uint256 => mapping(address => mapping(uint8 => uint256))) private UNDERDOG_usersChoices;

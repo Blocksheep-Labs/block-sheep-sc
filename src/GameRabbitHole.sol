@@ -4,7 +4,7 @@ pragma solidity ^0.8.20;
 import { IGameInterface } from "./IGameInterface.sol";
 
 contract GameRabbitHole is IGameInterface {
-    int256 private constant BPS = 1000;
+    int256 public constant BPS = 1000;
     // user chioces by gameId
     //        raceId           roundId           user          fuelSubmitted
     mapping(uint256 => mapping(uint256 => mapping(address => uint256))) private RABBITHOLE_usersChoices;
@@ -84,19 +84,24 @@ contract GameRabbitHole is IGameInterface {
             uint256 fuelLeft,
             uint256 roundIndex,
             address sender,
-            address[] memory leavedUsers
-        ) = abi.decode(data, (uint256, uint256, uint256, address, address[]));
+            address[] memory leavedUsers,
+            address[] memory allOtherUsers
+        ) = abi.decode(data, (uint256, uint256, uint256, address, address[], address[]));
 
         require(RABBITHOLE_roundWasParticipated[raceId][roundIndex][sender] == false, "Already participated at round");
 
         // if was not participated at the round, mark as participated and store fuel data
         if (RABBITHOLE_roundWasParticipated[raceId][roundIndex][sender] == false) {
-            RABBITHOLE_roundParticipants[raceId][roundIndex].push(sender);
+
+            if (!contains(RABBITHOLE_roundParticipants[raceId][roundIndex], sender)) {
+                RABBITHOLE_roundParticipants[raceId][roundIndex].push(sender);
+            }
+
             RABBITHOLE_usersChoices[raceId][roundIndex][sender] = fuelSubmission;
             RABBITHOLE_usersRemainingFuel[raceId][roundIndex][sender] = fuelLeft;
 
 
-            // set all other users fuel 0 if no submission yet
+            // set all leavedUsers users fuel 0 if no submission yet
             for (uint256 i = 0; i < leavedUsers.length; i++) {
                 // inGame[i] is a unique user that participates with sender
                 // user is not eliminated yet
@@ -113,6 +118,20 @@ contract GameRabbitHole is IGameInterface {
                         RABBITHOLE_usersRemainingFuel[raceId][roundIndex][leavedUsers[i]] = 0;
                         // leaved user participated at round
                         RABBITHOLE_roundWasParticipated[raceId][roundIndex][leavedUsers[i]] = true;
+                    }
+                }
+            }
+
+
+            // set all allOther users fuel 0 if no submission yet
+            for (uint256 i = 0; i < allOtherUsers.length; i++) {
+                // inGame[i] is a unique user that participates with sender
+                // user is not eliminated yet
+                if (
+                    RABBITHOLE_usersChoices[raceId][roundIndex][allOtherUsers[i]] <= 0
+                ) {
+                    if (!contains(RABBITHOLE_roundParticipants[raceId][roundIndex], allOtherUsers[i])) {
+                        RABBITHOLE_roundParticipants[raceId][roundIndex].push(allOtherUsers[i]);
                     }
                 }
             }
