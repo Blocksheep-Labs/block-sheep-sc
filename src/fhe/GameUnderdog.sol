@@ -1,0 +1,284 @@
+// SPDX-License-Identifier: MIT
+pragma solidity ^0.8.20;
+
+import { IGameInterface } from "./IGameInterface.sol";
+import { FHE, euint256, euint8 } from "@fhenixprotocol/contracts/FHE.sol";
+
+
+contract GameUnderdog is IGameInterface {
+    int256 public constant BPS = 1000;
+
+    // User choices by raceId, user, and questionIndex → only answer is encrypted
+    mapping(uint256 => mapping(address => mapping(uint8 => euint256))) private UNDERDOG_usersChoices;
+
+    // Track answer states (answered or not) for each question
+    mapping(uint256 => mapping(address => mapping(uint8 => bool))) private UNDERDOG_usersAnswers;
+
+    // Store questions for each raceId
+    mapping(uint256 => QuestionInfo[]) private UNDERDOG_questions;
+
+    // Users' points by raceId and address
+    mapping(uint256 => mapping(address => int256)) private UNDERDOG_points;
+
+    // Track if points have been distributed for each question
+    mapping(uint256 => mapping(uint8 => bool)) private UNDERDOG_pointsDistributed;
+
+    // Store players who answered each question for each race
+    mapping(uint256 => mapping(uint8 => address[])) private UNDERDOG_answeredPlayers;
+
+    // user changed tires
+    mapping(uint256 => mapping(address => bool)) public UNDERDOG_changedTyresBeforeTheGame;
+
+    struct QuestionInfo {
+        string content;
+        string[] answers;
+        string imgUrl;
+    }
+
+    struct QuestionInfoReturnType {
+        uint256 id;
+        QuestionInfo info;
+    }
+
+    function initRace(
+        uint256 raceId,
+        bytes memory initState
+    ) public {
+        QuestionInfo[] memory questionsInfo = abi.decode(initState, (QuestionInfo[]));
+        // Set the questions for the given raceId
+        delete UNDERDOG_questions[raceId];  // Clear any existing questions
+        for (uint256 i = 0; i < questionsInfo.length; i++) {
+            UNDERDOG_questions[raceId].push(questionsInfo[i]);
+        }
+    }
+
+    function getWinner(uint256 raceId) public view returns (address[] memory, int256[] memory) {
+        // First count the total unique players
+        uint256 uniquePlayerCount = 0;
+        address[] memory tempPlayers = new address[](9); // Temporary array with maximum possible size
+        int256[] memory tempPoints = new int256[](9);    // Temporary array with maximum possible size
+
+        // Loop through all questions to collect the addresses of the players who answered
+        for (uint8 qIndex = 0; qIndex < UNDERDOG_questions[raceId].length; qIndex++) {
+            address[] memory answeredPlayers = UNDERDOG_answeredPlayers[raceId][qIndex];
+
+            for (uint256 i = 0; i < answeredPlayers.length; i++) {
+                // Check if player is already in tempPlayers array
+                bool exists = false;
+                for (uint256 j = 0; j < uniquePlayerCount; j++) {
+                    if (tempPlayers[j] == answeredPlayers[i]) {
+                        exists = true;
+                        break;
+                    }
+                }
+
+                if (!exists) {
+                    tempPlayers[uniquePlayerCount] = answeredPlayers[i];
+                    tempPoints[uniquePlayerCount] = getPoints(answeredPlayers[i], raceId);
+                    uniquePlayerCount++;
+                }
+            }
+        }
+
+        // Create properly sized arrays for the return values
+        address[] memory players = new address[](uniquePlayerCount);
+        int256[] memory points = new int256[](uniquePlayerCount);
+
+        // Copy the data from the temporary arrays
+        for (uint256 i = 0; i < uniquePlayerCount; i++) {
+            players[i] = tempPlayers[i];
+            points[i] = tempPoints[i];
+        }
+
+        // Sort in descending order of points using simple bubble sort
+        for (uint256 i = 0; i < uniquePlayerCount; i++) {
+            for (uint256 j = i + 1; j < uniquePlayerCount; j++) {
+                if (points[j] > points[i]) {
+                    // Swap points
+                    int256 tempPoint = points[i];
+                    points[i] = points[j];
+                    points[j] = tempPoint;
+
+                    // Swap corresponding players
+                    address tempPlayer = players[i];
+                    players[i] = players[j];
+                    players[j] = tempPlayer;
+                }
+            }
+        }
+
+        return (players, points);
+    }
+
+    function getPoints(address user, uint256 raceId) public view returns (int256) {
+        int256 points = UNDERDOG_points[raceId][user];
+
+        if (UNDERDOG_changedTyresBeforeTheGame[raceId][user]) {
+            points = points * 25 / 10;
+        }
+
+
+        return points;
+    }
+
+    function getInternalScore(address, uint256) public pure returns (int256) {
+        return 0;
+    }
+
+    function getUserChoices(uint256 raceId, address user) external view override returns (euint256[] memory) {
+        uint256 questionsCount = UNDERDOG_questions[raceId].length;
+        euint256[] memory choices = new euint256[](questionsCount);
+
+        for (uint8 i = 0; i < questionsCount; i++) {
+            choices[i] = UNDERDOG_usersChoices[raceId][user][i];
+        }
+
+        return choices;
+    }
+
+    function makeMove(
+        uint256 raceId,
+        bytes memory data
+    ) external {
+        (uint8 questionIndex, euint256 answerIndex, address sender) = abi.decode(data, (uint8, euint256, address));
+
+        // Check if the player has already answered this question
+        require(UNDERDOG_usersAnswers[raceId][sender][questionIndex] == false, "Player has already answered this question");
+
+        // Mark the question as answered and store the user's choice
+        UNDERDOG_usersAnswers[raceId][sender][questionIndex] = true;
+        UNDERDOG_usersChoices[raceId][sender][questionIndex] = answerIndex; // encrypted input
+
+        FHE.allowGlobal(UNDERDOG_usersChoices[raceId][sender][questionIndex]); // encrypted value needs global access (just in our scenario)
+
+        // Add the player to the list of answered players for the specific question
+        UNDERDOG_answeredPlayers[raceId][questionIndex].push(sender);
+    }
+
+    function distribute(
+        uint256 raceId,
+        bytes memory data
+    ) external {
+        (uint8 questionIndex, bool distributeAll) = abi.decode(data, (uint8, bool));
+
+        if (distributeAll) {
+            // Iterate through the questions in the mapping and distribute rewards
+            for (uint8 qIndex = 0; qIndex < UNDERDOG_questions[raceId].length; qIndex++) {
+                _distributeRewardOfQuestion(raceId, qIndex);
+            }
+        } else {
+            _distributeRewardOfQuestion(raceId, questionIndex);
+        }
+
+    }
+
+
+    function getRules(
+        uint256 raceId
+    ) public view returns (bytes memory) {
+        uint256 length = UNDERDOG_questions[raceId].length;
+
+        // Initialize an array to store QuestionInfoReturnType structs
+        QuestionInfoReturnType[] memory questionsInfo = new QuestionInfoReturnType[](length);
+
+        // Populate the questionsInfo array
+        for (uint256 i = 0; i < length; i++) {
+            questionsInfo[i] = QuestionInfoReturnType({
+                id: i,
+                info: UNDERDOG_questions[raceId][i]
+            });
+        }
+
+        // Return the populated questionsInfo array
+        return abi.encode(questionsInfo);
+    }
+
+    function _distributeRewardOfQuestion(
+        uint256 raceId,
+        uint8 questionIndex
+    ) internal {
+        // If already distributed the question
+        if (UNDERDOG_pointsDistributed[raceId][questionIndex]) {
+            return;
+        }
+
+        // Get the question info
+        QuestionInfo[] storage questions = UNDERDOG_questions[raceId];
+
+        // Ensure the question index is valid
+        require(questionIndex < questions.length, "Invalid question index");
+
+        // Get the players who answered and their choices
+        address[] memory answeredPlayersList = UNDERDOG_answeredPlayers[raceId][questionIndex];
+        uint256 totalPlayers = answeredPlayersList.length;
+
+        // Count the answers for each choice
+        uint256[] memory answerCounts = new uint256[](questions[questionIndex].answers.length);
+        for (uint256 i = 0; i < totalPlayers; i++) {
+            // decrypt the player answer
+            FHE.decrypt(UNDERDOG_usersChoices[raceId][answeredPlayersList[i]][questionIndex]);
+
+            (uint256 result, ) = FHE.getDecryptResultSafe(
+                UNDERDOG_usersChoices[raceId][answeredPlayersList[i]][questionIndex]
+            );
+            answerCounts[result]++;
+        }
+
+
+        // If it's a draw, skip reward distribution
+        bool isDraw = true; // draw initially
+        uint256 firstCount = answerCounts[0]; // Get the first count to compare against
+
+        for (uint8 i = 1; i < answerCounts.length; i++) {
+            if (answerCounts[i] != firstCount) {
+                isDraw = false; // Found a count that is different
+                break; // No need to check further
+            }
+        }
+
+        if (isDraw) {
+            return; // Skip reward distribution if it's a draw
+        }
+
+
+        // Determine the winning answer ID (answer with the smallest number of players)
+        uint8 winningAnswerId = _getWinningAnswerIdWithSmallestCount(answerCounts);
+
+        // Distribute points for the winning answer
+        for (uint256 i = 0; i < totalPlayers; i++) {
+            // using decrypt method of FHE to decrypt and compare euint with uint
+            FHE.decrypt(UNDERDOG_usersChoices[raceId][answeredPlayersList[i]][questionIndex]);
+
+            (uint256 result, ) = FHE.getDecryptResultSafe(
+                UNDERDOG_usersChoices[raceId][answeredPlayersList[i]][questionIndex]
+            );
+
+            if (result == winningAnswerId) {
+                UNDERDOG_points[raceId][answeredPlayersList[i]] += 1 * BPS;
+            }
+        }
+
+        // Mark points as distributed for this question
+        UNDERDOG_pointsDistributed[raceId][questionIndex] = true;
+    }
+
+
+    function changeTyres(uint256 raceId, address user) public {
+        UNDERDOG_changedTyresBeforeTheGame[raceId][user] = true;
+    }
+
+    // Helper function to get the winning answer ID with the smallest count
+    function _getWinningAnswerIdWithSmallestCount(uint256[] memory answerCounts) internal pure returns (uint8) {
+        uint256 smallestCount = type(uint256).max; // Start with the maximum possible value
+        uint8 winningAnswerId = 0;
+
+        for (uint8 i = 0; i < answerCounts.length; i++) {
+            if (answerCounts[i] < smallestCount) {
+                smallestCount = answerCounts[i];
+                winningAnswerId = i; // Update winning answer ID
+            }
+        }
+
+        return winningAnswerId;
+    }
+}

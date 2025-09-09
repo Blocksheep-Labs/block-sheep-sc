@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {GameRabbitHole} from "../../src/GameRabbitHole.sol";
+import {GameRabbitHole} from "../../src/basic/GameRabbitHole.sol";
 
 contract GameRabbitHoleTest is Test {
     GameRabbitHole game;

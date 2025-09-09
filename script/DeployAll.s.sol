@@ -3,12 +3,12 @@ pragma solidity ^0.8.20;
 
 import "../lib/forge-std/src/Script.sol";
 // main contract
-import {BlockSheep} from "../src/BlockSheep.sol";
+import {BlockSheep} from "../src/basic/BlockSheep.sol";
 // games
-import {GameBullrun} from "../src/GameBullrun.sol";
-import {GameRabbitHole} from "../src/GameRabbitHole.sol";
-import {GameUnderdog} from "../src/GameUnderdog.sol";
-import {GameWhaleteeth} from "../src/GameWhaleteeth.sol";
+import {GameBullrun} from "../src/basic/GameBullrun.sol";
+import {GameRabbitHole} from "../src/basic/GameRabbitHole.sol";
+import {GameUnderdog} from "../src/basic/GameUnderdog.sol";
+import {GameWhaleteeth} from "../src/basic/GameWhaleteeth.sol";
 
 contract DeployAll is Script {
     function run() external {

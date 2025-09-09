@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import {Test} from "forge-std/Test.sol";
-import {GameBullrun} from "../../src/GameBullrun.sol";
+import {GameBullrun} from "../../src/basic/GameBullrun.sol";
 
 contract GameBullrunTest is Test {
     GameBullrun public game;

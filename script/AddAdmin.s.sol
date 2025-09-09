@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import "../src/BlockSheep.sol";
+import "../src/basic/BlockSheep.sol";
 import "../lib/forge-std/src/Script.sol";
 
 contract AddAdmin is Script {

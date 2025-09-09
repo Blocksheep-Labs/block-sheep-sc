@@ -4,13 +4,13 @@ pragma solidity ^0.8.20;
 import { Test } from "forge-std/Test.sol";
 import { console } from "forge-std/console.sol";
 
-import { BlockSheep } from "../../src/BlockSheep.sol";
-import { MockUSDC } from "../../src/MockUSDC.sol";
+import { BlockSheep } from "../../src/basic/BlockSheep.sol";
+import { MockUSDC } from "../../src/basic/MockUSDC.sol";
 
 // game contracts
-import { GameBullrun } from "../../src/GameBullrun.sol";
-import { GameRabbitHole } from"../../src/GameRabbitHole.sol";
-import { GameUnderdog } from "../../src/GameUnderdog.sol";
+import { GameBullrun } from "../../src/basic/GameBullrun.sol";
+import { GameRabbitHole } from"../../src/basic/GameRabbitHole.sol";
+import { GameUnderdog } from "../../src/basic/GameUnderdog.sol";
 
 
 contract BlockSheepTest is Test {

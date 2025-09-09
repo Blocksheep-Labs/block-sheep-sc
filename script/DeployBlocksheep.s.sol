@@ -2,7 +2,7 @@
 pragma solidity ^0.8.20;
 
 import "../lib/forge-std/src/Script.sol";
-import {BlockSheep} from "../src/BlockSheep.sol";
+import {BlockSheep} from "../src/basic/BlockSheep.sol";
 
 contract DeployBlockSheep is Script {
     function run() external {
