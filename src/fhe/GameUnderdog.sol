@@ -2,14 +2,15 @@
 pragma solidity ^0.8.20;
 
 import { IGameInterface } from "./IGameInterface.sol";
-import { FHE, euint256, euint8 } from "@fhenixprotocol/contracts/FHE.sol";
+import { FHE, euint8 } from "@fhenixprotocol/contracts/FHE.sol";
+import {console} from "forge-std/console.sol";
 
 
 contract GameUnderdog is IGameInterface {
     int256 public constant BPS = 1000;
 
     // User choices by raceId, user, and questionIndex → only answer is encrypted
-    mapping(uint256 => mapping(address => mapping(uint8 => euint256))) private UNDERDOG_usersChoices;
+    mapping(uint256 => mapping(address => mapping(uint8 => euint8))) private UNDERDOG_usersChoices;
 
     // Track answer states (answered or not) for each question
     mapping(uint256 => mapping(address => mapping(uint8 => bool))) private UNDERDOG_usersAnswers;
@@ -125,9 +126,10 @@ contract GameUnderdog is IGameInterface {
         return 0;
     }
 
-    function getUserChoices(uint256 raceId, address user) external view override returns (euint256[] memory) {
+    // returning encrypted choices (view) — makeMove sets allowGlobal so this can stay view
+    function getUserChoices(uint256 raceId, address user) external view returns (euint8[] memory) {
         uint256 questionsCount = UNDERDOG_questions[raceId].length;
-        euint256[] memory choices = new euint256[](questionsCount);
+        euint8[] memory choices = new euint8[](questionsCount);
 
         for (uint8 i = 0; i < questionsCount; i++) {
             choices[i] = UNDERDOG_usersChoices[raceId][user][i];
@@ -136,20 +138,21 @@ contract GameUnderdog is IGameInterface {
         return choices;
     }
 
+
     function makeMove(
         uint256 raceId,
         bytes memory data
     ) external {
-        (uint8 questionIndex, euint256 answerIndex, address sender) = abi.decode(data, (uint8, euint256, address));
+        (uint8 questionIndex, uint8 answerIndex, address sender) = abi.decode(data, (uint8, uint8, address));
 
         // Check if the player has already answered this question
         require(UNDERDOG_usersAnswers[raceId][sender][questionIndex] == false, "Player has already answered this question");
 
         // Mark the question as answered and store the user's choice
         UNDERDOG_usersAnswers[raceId][sender][questionIndex] = true;
-        UNDERDOG_usersChoices[raceId][sender][questionIndex] = answerIndex; // encrypted input
 
-        FHE.allowGlobal(UNDERDOG_usersChoices[raceId][sender][questionIndex]); // encrypted value needs global access (just in our scenario)
+        UNDERDOG_usersChoices[raceId][sender][questionIndex] = FHE.asEuint8(answerIndex);
+        FHE.allowGlobal(UNDERDOG_usersChoices[raceId][sender][questionIndex]);
 
         // Add the player to the list of answered players for the specific question
         UNDERDOG_answeredPlayers[raceId][questionIndex].push(sender);

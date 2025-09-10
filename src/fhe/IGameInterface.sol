@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.20;
 
-import {FHE, euint256, eaddress} from "@fhenixprotocol/contracts/FHE.sol";
+import {FHE, euint8} from "@fhenixprotocol/contracts/FHE.sol";
 
 
 interface IGameInterface {
@@ -10,7 +10,7 @@ interface IGameInterface {
 
     function getInternalScore(address user, uint256 raceId) external view returns (int256);
 
-    function getUserChoices(uint256 raceId, address user) external view returns (euint256[] memory);
+    function getUserChoices(uint256 raceId, address user) external view returns (euint8[] memory);
 
     function getWinner(uint256 raceId) external view returns (address[] memory, int256[] memory);
 
