@@ -12,6 +12,7 @@ contract BlockSheep is Ownable {
 
     int256 private constant BPS = 1000;
     uint64 private constant MIN_SECONDS_BEFORE_START_RACE = 5 minutes;
+    uint256 public house = 0;
 
     mapping(uint256 => Race) public races;
 
@@ -31,6 +32,8 @@ contract BlockSheep is Ownable {
 
     // refunds / usdc withdrawals
     mapping(uint256 => mapping(address => uint256)) public raceWithdrawals;
+    mapping(uint256 => bool) public houseCalculated;
+
 
 
 
@@ -91,75 +94,77 @@ contract BlockSheep is Ownable {
         // make the game completed
         race.endAt = uint64(block.timestamp);
 
-        // Gather user + score pairs
-        address[] memory sortedUsers = new address[](userCount);
-        int256[] memory scores = new int256[](userCount);
-        for (uint256 i = 0; i < userCount; i++) {
-            sortedUsers[i] = users[i];
-            scores[i] = getScoreAtRaceOfUser(raceId, users[i]);
-        }
+        // distribution must be executed only for races where usersCount >= 3 and <= 9
+        if (userCount >= 3 && userCount <= 9) {
+            // Gather user + score pairs
+            address[] memory sortedUsers = new address[](userCount);
+            int256[] memory scores = new int256[](userCount);
+            for (uint256 i = 0; i < userCount; i++) {
+                sortedUsers[i] = users[i];
+                scores[i] = getScoreAtRaceOfUser(raceId, users[i]);
+            }
 
-        // Sort by score descending using simple bubble sort (for clarity)
-        for (uint256 i = 0; i < userCount - 1; i++) {
-            for (uint256 j = i + 1; j < userCount; j++) {
-                if (scores[j] > scores[i]) {
-                    // Swap scores
-                    int256 tempScore = scores[i];
-                    scores[i] = scores[j];
-                    scores[j] = tempScore;
+            // Sort by score descending using simple bubble sort (for clarity)
+            for (uint256 i = 0; i < userCount - 1; i++) {
+                for (uint256 j = i + 1; j < userCount; j++) {
+                    if (scores[j] > scores[i]) {
+                        // Swap scores
+                        int256 tempScore = scores[i];
+                        scores[i] = scores[j];
+                        scores[j] = tempScore;
 
-                    // Swap users to keep alignment
-                    address tempUser = sortedUsers[i];
-                    sortedUsers[i] = sortedUsers[j];
-                    sortedUsers[j] = tempUser;
+                        // Swap users to keep alignment
+                        address tempUser = sortedUsers[i];
+                        sortedUsers[i] = sortedUsers[j];
+                        sortedUsers[j] = tempUser;
+                    }
                 }
             }
-        }
 
-        // Determine position of msg.sender
-        uint256 rank = userCount;
-        int256 userScore = 0;
-        for (uint256 i = 0; i < userCount; i++) {
-            if (sortedUsers[i] == msg.sender) {
-                rank = i;
-                userScore = scores[i];
-                break;
-            }
-        }
+            // each value * entryPrice gives payout
+            uint256[] multipliers = determineMultipliers(userCount);
 
-        uint256 topK = userCount / 2;
+            // scale back to 1.00 units
+            // house cut also depends on number of players
+            uint256 houseCut;
+            if (userCount == 9) houseCut = 100;
+            else if (userCount == 8) houseCut = 90;
+            else if (userCount == 7) houseCut = 80;
+            else if (userCount == 6) houseCut = 70;
+            else if (userCount == 5) houseCut = 50;
+            else if (userCount == 4) houseCut = 50;
+            else if (userCount == 3) houseCut = 100;
 
-        // Only top half get refund
-        if (rank < topK) {
-            // --- Prize distribution ---
-            uint256 prizePool = race.entryPrice * userCount;
-
-            uint256 baseRefundTotal = race.entryPrice * topK;
-            uint256 bonusPool = prizePool - baseRefundTotal;
-
-            uint256 totalWeight = (topK * (topK + 1)) / 2; // sum 1..topK
-            uint256 weight = topK - rank;
-
-            // Base refund: always entry price
-            uint256 refundAmount = race.entryPrice;
-
-            // Proportional bonus
-            uint256 bonus = (bonusPool * weight) / totalWeight;
-
-            // Handle remainder: assign to 1st place
-            if (rank == 0) {
-                uint256 distributed = 0;
-                for (uint256 i = 0; i < topK; i++) {
-                    distributed += (bonusPool * (topK - i)) / totalWeight;
+            // Determine position of msg.sender
+            uint256 rank = userCount;
+            int256 userScore = 0;
+            for (uint256 i = 0; i < userCount; i++) {
+                if (sortedUsers[i] == msg.sender) {
+                    rank = i;
+                    userScore = scores[i];
+                    break;
                 }
-                uint256 remainder = bonusPool - distributed;
-                bonus += remainder;
             }
 
-            refundAmount += bonus;
+            // payout distribution
+            uint256 entry = race.entryPrice;
+            uint256 payout = 0;
 
-            raceWithdrawals[raceId][msg.sender] = refundAmount;
-            emit Withdrawed(msg.sender, refundAmount);
+            // prevent function revert
+            if (rank <= 3) {
+                payout = (entry * multipliers[rank]) / 100;
+            }
+
+            if (payout > 0) {
+                raceWithdrawals[raceId][sortedUsers[rank]] = payout;
+                emit Withdrawed(sortedUsers[rank], payout);
+            }
+
+            if (!houseCalculated[raceId]) {
+                houseCalculated[raceId] = true;
+                uint256 totalHouse = (entry * houseCut) / 100;
+                house += totalHouse;
+            }
         }
 
         race.refunded[msg.sender] = true;
@@ -180,73 +185,67 @@ contract BlockSheep is Ownable {
         address[] memory users = raceInfoById.registeredUsers;
         uint256 userCount = users.length;
 
-        // Gather user + score pairs
-        address[] memory sortedUsers = new address[](userCount);
-        int256[] memory scores = new int256[](userCount);
-        for (uint256 i = 0; i < userCount; i++) {
-            sortedUsers[i] = users[i];
-            scores[i] = getScoreAtRaceOfUser(raceId, users[i]);
-        }
+        // distribution must be executed only for races where usersCount >= 3 and <= 9
+        if (userCount >= 3 && userCount <= 9) {
+            // Gather user + score pairs
+            address[] memory sortedUsers = new address[](userCount);
+            int256[] memory scores = new int256[](userCount);
+            for (uint256 i = 0; i < userCount; i++) {
+                sortedUsers[i] = users[i];
+                scores[i] = getScoreAtRaceOfUser(raceId, users[i]);
+            }
 
-        // Sort by score descending using simple bubble sort (for clarity)
-        for (uint256 i = 0; i < userCount - 1; i++) {
-            for (uint256 j = i + 1; j < userCount; j++) {
-                if (scores[j] > scores[i]) {
-                    // Swap scores
-                    int256 tempScore = scores[i];
-                    scores[i] = scores[j];
-                    scores[j] = tempScore;
+            // Sort by score descending using simple bubble sort (for clarity)
+            for (uint256 i = 0; i < userCount - 1; i++) {
+                for (uint256 j = i + 1; j < userCount; j++) {
+                    if (scores[j] > scores[i]) {
+                        // Swap scores
+                        int256 tempScore = scores[i];
+                        scores[i] = scores[j];
+                        scores[j] = tempScore;
 
-                    // Swap users to keep alignment
-                    address tempUser = sortedUsers[i];
-                    sortedUsers[i] = sortedUsers[j];
-                    sortedUsers[j] = tempUser;
+                        // Swap users to keep alignment
+                        address tempUser = sortedUsers[i];
+                        sortedUsers[i] = sortedUsers[j];
+                        sortedUsers[j] = tempUser;
+                    }
                 }
             }
-        }
 
-        // Determine position of msg.sender
-        uint256 rank = userCount;
-        int256 userScore = 0;
-        for (uint256 i = 0; i < userCount; i++) {
-            if (sortedUsers[i] == user) {
-                rank = i;
-                userScore = scores[i];
-                break;
-            }
-        }
+            // each value * entryPrice gives payout
+            uint256[] multipliers = determineMultipliers(userCount);
 
-        uint256 topK = userCount / 2;
-
-        // Only top half get refund
-        if (rank < topK) {
-            // --- Prize distribution ---
-            uint256 prizePool = race.entryPrice * userCount;
-
-            uint256 baseRefundTotal = race.entryPrice * topK;
-            uint256 bonusPool = prizePool - baseRefundTotal;
-
-            uint256 totalWeight = (topK * (topK + 1)) / 2; // sum 1..topK
-            uint256 weight = topK - rank;
-
-            // Base refund: always entry price
-            refundAmount = race.entryPrice;
-
-            // Proportional bonus
-            uint256 bonus = (bonusPool * weight) / totalWeight;
-
-            // Handle remainder: assign to 1st place
-            if (rank == 0) {
-                uint256 distributed = 0;
-                for (uint256 i = 0; i < topK; i++) {
-                    distributed += (bonusPool * (topK - i)) / totalWeight;
+            // Determine position of msg.sender
+            uint256 rank = userCount;
+            int256 userScore = 0;
+            for (uint256 i = 0; i < userCount; i++) {
+                if (sortedUsers[i] == msg.sender) {
+                    rank = i;
+                    userScore = scores[i];
+                    break;
                 }
-                uint256 remainder = bonusPool - distributed;
-                bonus += remainder;
             }
 
-            refundAmount += bonus;
+            // prevent function revert
+            if (rank <= 3) {
+                refundAmount = (race.entryPrice * multipliers[rank]) / 100;
+            }
         }
+    }
+
+
+    function determineMultipliers(uint256 userCount) external pure returns (uint256[] memory) {
+        uint256[4] memory multipliers;
+
+        if      (userCount == 9) multipliers = [410, 180, 110, 100];
+        else if (userCount == 8) multipliers = [350, 150, 110, 100];
+        else if (userCount == 7) multipliers = [360, 150, 110, 0  ];
+        else if (userCount == 6) multipliers = [280, 150, 110, 0  ];
+        else if (userCount == 5) multipliers = [250, 200, 100, 0  ];
+        else if (userCount == 4) multipliers = [200, 150, 0,   0  ];
+        else if (userCount == 3) multipliers = [200, 0,   0,   0  ];
+
+        return multipliers;
     }
 
 
