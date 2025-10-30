@@ -171,31 +171,32 @@ contract BlockSheepTest is Test {
 
             uint256 raceId = e;
 
+            // tests performs with 7 registered users
             if (entryPrice == 10) {
-                assertEq(bls.possibleRefundingAmount(raceId, user1), 31);
-                assertEq(bls.possibleRefundingAmount(raceId, user2), 23);
-                assertEq(bls.possibleRefundingAmount(raceId, user3), 16);
+                assertEq(bls.possibleRefundingAmount(raceId, user1), 3600);
+                assertEq(bls.possibleRefundingAmount(raceId, user2), 1500);
+                assertEq(bls.possibleRefundingAmount(raceId, user3), 1100);
                 assertEq(bls.possibleRefundingAmount(raceId, user4), 0);
             }
 
             if (entryPrice == 5) {
-                assertEq(bls.possibleRefundingAmount(raceId, user1), 16);
-                assertEq(bls.possibleRefundingAmount(raceId, user2), 11);
-                assertEq(bls.possibleRefundingAmount(raceId, user3), 8);
+                assertEq(bls.possibleRefundingAmount(raceId, user1), 1800);
+                assertEq(bls.possibleRefundingAmount(raceId, user2), 750);
+                assertEq(bls.possibleRefundingAmount(raceId, user3), 550);
                 assertEq(bls.possibleRefundingAmount(raceId, user4), 0);
             }
 
             if (entryPrice == 2) {
-                assertEq(bls.possibleRefundingAmount(raceId, user1), 7);
-                assertEq(bls.possibleRefundingAmount(raceId, user2), 4);
-                assertEq(bls.possibleRefundingAmount(raceId, user3), 3);
+                assertEq(bls.possibleRefundingAmount(raceId, user1), 720);
+                assertEq(bls.possibleRefundingAmount(raceId, user2), 300);
+                assertEq(bls.possibleRefundingAmount(raceId, user3), 220);
                 assertEq(bls.possibleRefundingAmount(raceId, user4), 0);
             }
 
             if (entryPrice == 1) {
-                assertEq(bls.possibleRefundingAmount(raceId, user1), 4);
-                assertEq(bls.possibleRefundingAmount(raceId, user2), 2);
-                assertEq(bls.possibleRefundingAmount(raceId, user3), 1);
+                assertEq(bls.possibleRefundingAmount(raceId, user1), 360);
+                assertEq(bls.possibleRefundingAmount(raceId, user2), 150);
+                assertEq(bls.possibleRefundingAmount(raceId, user3), 110);
                 assertEq(bls.possibleRefundingAmount(raceId, user4), 0);
             }
         }

@@ -80,6 +80,27 @@ contract BlockSheep is Ownable {
         userHasAdminAccess[owner] = true;
     }
 
+    function withdrawHouse(address withdrawTo, uint256 amount) public {
+        require(userHasAdminAccess[msg.sender] == true || msg.sender == owner(), "Access denied");
+
+        emit Withdrawed(withdrawTo, amount);
+        house -= amount;
+    }
+
+    function determineMultipliers(uint256 userCount) internal pure returns (uint256[4] memory) {
+        uint256[4] memory multipliers;
+
+        if      (userCount == 9) multipliers = [uint256(410), 180, 110, 100];
+        else if (userCount == 8) multipliers = [uint256(350), 150, 110, 100];
+        else if (userCount == 7) multipliers = [uint256(360), 150, 110, 0  ];
+        else if (userCount == 6) multipliers = [uint256(280), 150, 110, 0  ];
+        else if (userCount == 5) multipliers = [uint256(250), 200, 100, 0  ];
+        else if (userCount == 4) multipliers = [uint256(200), 150, 0,   0  ];
+        else if (userCount == 3) multipliers = [uint256(200), 0,   0,   0  ];
+
+        return multipliers;
+    }
+
 
     function refundWinningBalance(uint256 raceId) external {
         Race storage race = races[raceId];
@@ -122,7 +143,7 @@ contract BlockSheep is Ownable {
             }
 
             // each value * entryPrice gives payout
-            uint256[] multipliers = determineMultipliers(userCount);
+            uint256[4] memory multipliers = determineMultipliers(userCount);
 
             // scale back to 1.00 units
             // house cut also depends on number of players
@@ -152,7 +173,7 @@ contract BlockSheep is Ownable {
 
             // prevent function revert
             if (rank <= 3) {
-                payout = (entry * multipliers[rank]) / 100;
+                payout = (entry * multipliers[rank]);
             }
 
             if (payout > 0) {
@@ -162,8 +183,7 @@ contract BlockSheep is Ownable {
 
             if (!houseCalculated[raceId]) {
                 houseCalculated[raceId] = true;
-                uint256 totalHouse = (entry * houseCut) / 100;
-                house += totalHouse;
+                house += entry * houseCut;
             }
         }
 
@@ -213,13 +233,13 @@ contract BlockSheep is Ownable {
             }
 
             // each value * entryPrice gives payout
-            uint256[] multipliers = determineMultipliers(userCount);
+            uint256[4] memory multipliers = determineMultipliers(userCount);
 
-            // Determine position of msg.sender
+            // Determine position of user
             uint256 rank = userCount;
             int256 userScore = 0;
             for (uint256 i = 0; i < userCount; i++) {
-                if (sortedUsers[i] == msg.sender) {
+                if (sortedUsers[i] == user) {
                     rank = i;
                     userScore = scores[i];
                     break;
@@ -228,24 +248,9 @@ contract BlockSheep is Ownable {
 
             // prevent function revert
             if (rank <= 3) {
-                refundAmount = (race.entryPrice * multipliers[rank]) / 100;
+                refundAmount = (race.entryPrice) * multipliers[rank];
             }
         }
-    }
-
-
-    function determineMultipliers(uint256 userCount) external pure returns (uint256[] memory) {
-        uint256[4] memory multipliers;
-
-        if      (userCount == 9) multipliers = [410, 180, 110, 100];
-        else if (userCount == 8) multipliers = [350, 150, 110, 100];
-        else if (userCount == 7) multipliers = [360, 150, 110, 0  ];
-        else if (userCount == 6) multipliers = [280, 150, 110, 0  ];
-        else if (userCount == 5) multipliers = [250, 200, 100, 0  ];
-        else if (userCount == 4) multipliers = [200, 150, 0,   0  ];
-        else if (userCount == 3) multipliers = [200, 0,   0,   0  ];
-
-        return multipliers;
     }
 
 
