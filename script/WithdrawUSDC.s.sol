@@ -21,7 +21,7 @@ contract WithdrawUSDC is Script {
     }
 }
 
-// 1: 0x2940d1239c3122F0e316d2af923e7A62d700A5c4
+// 1: 0x2940d1239c3122F0e316d2af923e7A62d700A5c4 0x477a251Bd5647C39839aA007C5FfA2Cf20594479
 // 2: withdraw to address
 // 3: 1 USDC is 1.000.000 (10**6)
 
