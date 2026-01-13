@@ -27,15 +27,14 @@ contract BlockSheep is Ownable {
     mapping(uint256 => mapping(address => bool)) public payedRaceEntries;
 
     // raceId      // event (game, other stuff)   // user    // negative points
-    mapping(uint256 => mapping(string => mapping(address => int256))) public raceUpdateBonusMalusPoints;
-    mapping(uint256 => mapping(string => mapping(address => bool))) public raceUpdateBonusMalusPointsOfUser;
+    mapping(uint256 => mapping(string => mapping(address => int256)))
+        public raceUpdateBonusMalusPoints;
+    mapping(uint256 => mapping(string => mapping(address => bool)))
+        public raceUpdateBonusMalusPointsOfUser;
 
     // refunds / usdc withdrawals
     mapping(uint256 => mapping(address => uint256)) public raceWithdrawals;
     mapping(uint256 => bool) public houseCalculated;
-
-
-
 
     enum RaceStatus {
         NON_EXIST,
@@ -46,7 +45,7 @@ contract BlockSheep is Ownable {
     }
 
     struct Race {
-        uint8 entryPrice;
+        uint256 entryPrice;
         uint8 storyKey;
         uint8 numOfPlayersRequired;
         uint64 endAt;
@@ -60,7 +59,7 @@ contract BlockSheep is Ownable {
     struct RaceInfo {
         bool refunded;
         bool registered;
-        uint8 entryPrice;
+        uint256 entryPrice;
         uint8 storyKey;
         uint8 numOfPlayersRequired;
         uint64 endAt;
@@ -74,33 +73,35 @@ contract BlockSheep is Ownable {
     event Withdrawed(address user, uint256 amount);
     event RaceCreated(); // TODO: update
 
-    constructor(
-        address owner
-    ) Ownable(owner) {
+    constructor(address owner) Ownable(owner) {
         userHasAdminAccess[owner] = true;
     }
 
     function withdrawHouse(address withdrawTo, uint256 amount) public {
-        require(userHasAdminAccess[msg.sender] == true || msg.sender == owner(), "Access denied");
+        require(
+            userHasAdminAccess[msg.sender] == true || msg.sender == owner(),
+            "Access denied"
+        );
 
         emit Withdrawed(withdrawTo, amount);
         house -= amount;
     }
 
-    function determineMultipliers(uint256 userCount) internal pure returns (uint256[4] memory) {
+    function determineMultipliers(
+        uint256 userCount
+    ) internal pure returns (uint256[4] memory) {
         uint256[4] memory multipliers;
 
-        if      (userCount == 9) multipliers = [uint256(410), 180, 110, 100];
-        else if (userCount == 8) multipliers = [uint256(350), 150, 110, 100];
-        else if (userCount == 7) multipliers = [uint256(360), 150, 110, 0  ];
-        else if (userCount == 6) multipliers = [uint256(280), 150, 110, 0  ];
-        else if (userCount == 5) multipliers = [uint256(250), 200, 100, 0  ];
-        else if (userCount == 4) multipliers = [uint256(200), 150, 0,   0  ];
-        else if (userCount == 3) multipliers = [uint256(200), 0,   0,   0  ];
+        if (userCount == 9) multipliers = [uint256(456), 200, 122, 111];
+        else if (userCount == 8) multipliers = [uint256(438), 188, 138, 125];
+        else if (userCount == 7) multipliers = [uint256(514), 214, 157, 0];
+        else if (userCount == 6) multipliers = [uint256(467), 250, 167, 0];
+        else if (userCount == 5) multipliers = [uint256(500), 400, 0, 0];
+        else if (userCount == 4) multipliers = [uint256(500), 375, 0, 0];
+        else if (userCount == 3) multipliers = [uint256(667), 0, 0, 0];
 
         return multipliers;
     }
-
 
     function refundWinningBalance(uint256 raceId) external {
         Race storage race = races[raceId];
@@ -148,13 +149,13 @@ contract BlockSheep is Ownable {
             // scale back to 1.00 units
             // house cut also depends on number of players
             uint256 houseCut;
-            if (userCount == 9) houseCut = 100;
-            else if (userCount == 8) houseCut = 90;
-            else if (userCount == 7) houseCut = 80;
-            else if (userCount == 6) houseCut = 70;
-            else if (userCount == 5) houseCut = 50;
-            else if (userCount == 4) houseCut = 50;
-            else if (userCount == 3) houseCut = 100;
+            if (userCount == 9) houseCut = 111;
+            else if (userCount == 8) houseCut = 111;
+            else if (userCount == 7) houseCut = 114;
+            else if (userCount == 6) houseCut = 117;
+            else if (userCount == 5) houseCut = 100;
+            else if (userCount == 4) houseCut = 125;
+            else if (userCount == 3) houseCut = 333;
 
             // Determine position of msg.sender
             uint256 rank = userCount;
@@ -168,12 +169,12 @@ contract BlockSheep is Ownable {
             }
 
             // payout distribution
-            uint256 entry = race.entryPrice;
+            uint256 totalPool = race.entryPrice * userCount;
             uint256 payout = 0;
 
             // prevent function revert
             if (rank <= 3) {
-                payout = (entry * multipliers[rank]);
+                payout = (totalPool * multipliers[rank]) / uint256(BPS);
             }
 
             if (payout > 0) {
@@ -183,14 +184,17 @@ contract BlockSheep is Ownable {
 
             if (!houseCalculated[raceId]) {
                 houseCalculated[raceId] = true;
-                house += entry * houseCut;
+                house += (totalPool * houseCut) / uint256(BPS);
             }
         }
 
         race.refunded[msg.sender] = true;
     }
 
-    function possibleRefundingAmount(uint256 raceId, address user) public view returns(uint256 refundAmount) {
+    function possibleRefundingAmount(
+        uint256 raceId,
+        address user
+    ) public view returns (uint256 refundAmount) {
         refundAmount = 0;
         Race storage race = races[raceId];
         if (
@@ -248,20 +252,27 @@ contract BlockSheep is Ownable {
 
             // prevent function revert
             if (rank <= 3) {
-                refundAmount = (race.entryPrice) * multipliers[rank];
+                refundAmount =
+                    (race.entryPrice * userCount * multipliers[rank]) /
+                    uint256(BPS);
             }
         }
     }
 
-
     function register(uint256 raceId, address user) external {
-        require(userHasAdminAccess[msg.sender] == true || msg.sender == owner(), "Access denied");
+        require(
+            userHasAdminAccess[msg.sender] == true || msg.sender == owner(),
+            "Access denied"
+        );
 
         Race storage race = races[raceId];
         require(raceId < nextRaceId, "Invalid race ID");
         require(block.timestamp < race.endAt, "Race is finished");
         require(race.playerRegistered[user] == false, "Already registered");
-        require(race.registeredUsers.length < race.numOfPlayersRequired, "Race is full");
+        require(
+            race.registeredUsers.length < race.numOfPlayersRequired,
+            "Race is full"
+        );
 
         race.playerRegistered[user] = true;
         race.registeredUsers.push(user);
@@ -278,13 +289,16 @@ contract BlockSheep is Ownable {
     }
 
     // Set the address for a specific contract
-    function registerContract(string memory name, address contractAddress) external {
+    function registerContract(
+        string memory name,
+        address contractAddress
+    ) external {
         targetContracts[name] = contractAddress;
     }
 
     /// Admin functions
     function addRace(
-        uint8 entryPrice,
+        uint256 entryPrice,
         uint64 hoursBeforeFinish,
         uint8 numOfPlayersRequired,
         uint8 storyKey,
@@ -297,7 +311,10 @@ contract BlockSheep is Ownable {
         // }
 
         uint64 endAt = uint64(block.timestamp + (hoursBeforeFinish * 1 hours));
-        require(endAt > block.timestamp + MIN_SECONDS_BEFORE_START_RACE, "Invalid timestamp");
+        require(
+            endAt > block.timestamp + MIN_SECONDS_BEFORE_START_RACE,
+            "Invalid timestamp"
+        );
 
         Race storage _race = races[nextRaceId];
         _race.entryPrice = entryPrice;
@@ -328,7 +345,6 @@ contract BlockSheep is Ownable {
         nextRaceId++;
     }
 
-
     function getRaceStatus(uint256 raceId) public view returns (RaceStatus) {
         if (raceId > nextRaceId) return RaceStatus.NON_EXIST;
         Race storage race = races[raceId];
@@ -339,8 +355,10 @@ contract BlockSheep is Ownable {
         return RaceStatus.STARTED;
     }
 
-
-    function getRace(uint256 id, address user) public view returns (RaceInfo memory raceInfo) {
+    function getRace(
+        uint256 id,
+        address user
+    ) public view returns (RaceInfo memory raceInfo) {
         Race storage race = races[id];
 
         raceInfo.entryPrice = race.entryPrice;
@@ -364,7 +382,6 @@ contract BlockSheep is Ownable {
         raceInfo.storyKey = race.storyKey;
     }
 
-
     function getScoreAtRaceOfUser(
         uint256 raceId,
         address user
@@ -382,17 +399,21 @@ contract BlockSheep is Ownable {
             }
 
             // 2. Sprint bonus: SPRINT_{SCREEN}
-            string memory sprintKey = string(abi.encodePacked("SPRINT_", screen));
+            string memory sprintKey = string(
+                abi.encodePacked("SPRINT_", screen)
+            );
             score += raceUpdateBonusMalusPoints[raceId][sprintKey][user];
 
-
             // 3. Obstacle malus: OBSTACLE_{SCREEN}
-            string memory obstacleKey = string(abi.encodePacked("OBSTACLE_", screen));
+            string memory obstacleKey = string(
+                abi.encodePacked("OBSTACLE_", screen)
+            );
             score += raceUpdateBonusMalusPoints[raceId][obstacleKey][user];
 
-
             // 4. Change tyres penalty: CHANGE_TYRES_{SCREEN}
-            string memory tyresKey = string(abi.encodePacked("CHANGE_TYRES_", screen));
+            string memory tyresKey = string(
+                abi.encodePacked("CHANGE_TYRES_", screen)
+            );
             score += raceUpdateBonusMalusPoints[raceId][tyresKey][user];
 
             // 5. Bonuses from mini-games like "steering wheel in underdog"
@@ -401,17 +422,16 @@ contract BlockSheep is Ownable {
         }
 
         // Jump into boat at whaleteeth intro
-        string memory jumpIntoBoatKey = string(abi.encodePacked("JUMP_INTO_BOAT"));
+        string memory jumpIntoBoatKey = string(
+            abi.encodePacked("JUMP_INTO_BOAT")
+        );
         score += raceUpdateBonusMalusPoints[raceId][jumpIntoBoatKey][user];
 
         // Add race start points (not tied to screen)
         score += raceUpdateBonusMalusPoints[raceId]["RACE_START"][user];
 
-
         return score;
     }
-
-
 
     function getRacesWithPagination(
         address user,
@@ -454,57 +474,119 @@ contract BlockSheep is Ownable {
     }
 
     // Function to check if a player is registered for a specific race
-    function isPlayerRegistered(uint256 raceId, address player) public view returns (bool) {
+    function isPlayerRegistered(
+        uint256 raceId,
+        address player
+    ) public view returns (bool) {
         return races[raceId].playerRegistered[player];
     }
 
-
-
-    function getPoints(string memory gameName, address user, uint256 raceId) public view returns (int256) {
-        return IGameInterface(targetContracts[gameName]).getPoints(user, raceId);
+    function getPoints(
+        string memory gameName,
+        address user,
+        uint256 raceId
+    ) public view returns (int256) {
+        return
+            IGameInterface(targetContracts[gameName]).getPoints(user, raceId);
     }
 
-    function getInternalScore(string memory gameName, address user, uint256 raceId) public view returns (int256) {
-        return IGameInterface(targetContracts[gameName]).getInternalScore(user, raceId);
+    function getInternalScore(
+        string memory gameName,
+        address user,
+        uint256 raceId
+    ) public view returns (int256) {
+        return
+            IGameInterface(targetContracts[gameName]).getInternalScore(
+                user,
+                raceId
+            );
     }
 
-    function getUserChoices(string memory gameName, uint256 raceId, address user) public view returns (uint256[] memory) {
-        return IGameInterface(targetContracts[gameName]).getUserChoices(raceId, user);
+    function getUserChoices(
+        string memory gameName,
+        uint256 raceId,
+        address user
+    ) public view returns (uint256[] memory) {
+        return
+            IGameInterface(targetContracts[gameName]).getUserChoices(
+                raceId,
+                user
+            );
     }
 
-    function getWinner(string memory gameName, uint256 raceId) public view returns (address[] memory, int256[] memory) {
+    function getWinner(
+        string memory gameName,
+        uint256 raceId
+    ) public view returns (address[] memory, int256[] memory) {
         return IGameInterface(targetContracts[gameName]).getWinner(raceId);
     }
 
-    function getRules(string memory gameName, uint256 raceId) public view returns (bytes memory) {
+    function getRules(
+        string memory gameName,
+        uint256 raceId
+    ) public view returns (bytes memory) {
         return IGameInterface(targetContracts[gameName]).getRules(raceId);
     }
 
-    function makeMove(string memory gameName, uint256 raceId, bytes memory data) public {
+    function makeMove(
+        string memory gameName,
+        uint256 raceId,
+        bytes memory data
+    ) public {
         IGameInterface(targetContracts[gameName]).makeMove(raceId, data);
     }
 
-    function distribute(string memory gameName, uint256 raceId, bytes memory data) public {
+    function distribute(
+        string memory gameName,
+        uint256 raceId,
+        bytes memory data
+    ) public {
         IGameInterface(targetContracts[gameName]).distribute(raceId, data);
     }
 
-    function initRace(string memory gameName, uint256 raceId, bytes memory data) public {
+    function initRace(
+        string memory gameName,
+        uint256 raceId,
+        bytes memory data
+    ) public {
         IGameInterface(targetContracts[gameName]).initRace(raceId, data);
     }
 
-
-    function changeTyres(string memory raceUpdateScreen, string memory nextGameScreen, uint256 raceId) public {
-        string memory event_name = string(abi.encodePacked("CHANGE_TYRES_", raceUpdateScreen));
-        require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
+    function changeTyres(
+        string memory raceUpdateScreen,
+        string memory nextGameScreen,
+        uint256 raceId
+    ) public {
+        string memory event_name = string(
+            abi.encodePacked("CHANGE_TYRES_", raceUpdateScreen)
+        );
+        require(
+            raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] ==
+                false,
+            "Already passed"
+        );
 
         raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = -2 * BPS;
         raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
-        IGameInterface(targetContracts[nextGameScreen]).changeTyres(raceId, msg.sender);
+        IGameInterface(targetContracts[nextGameScreen]).changeTyres(
+            raceId,
+            msg.sender
+        );
     }
 
-    function jumpAnObstacle(string memory raceUpdateScreen, uint256 raceId, bool isJumped) public {
-        string memory event_name = string(abi.encodePacked("OBSTACLE_", raceUpdateScreen));
-        require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
+    function jumpAnObstacle(
+        string memory raceUpdateScreen,
+        uint256 raceId,
+        bool isJumped
+    ) public {
+        string memory event_name = string(
+            abi.encodePacked("OBSTACLE_", raceUpdateScreen)
+        );
+        require(
+            raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] ==
+                false,
+            "Already passed"
+        );
 
         if (!isJumped) {
             raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = -300;
@@ -514,18 +596,30 @@ contract BlockSheep is Ownable {
 
     function jumpIntoBoat(uint256 raceId, bool isJumped) public {
         string memory event_name = string(abi.encodePacked("JUMP_INTO_BOAT"));
-        require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
+        require(
+            raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] ==
+                false,
+            "Already passed"
+        );
 
         if (!isJumped) {
-            raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = -1 * BPS;
+            raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] =
+                -1 *
+                BPS;
         }
 
         raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
     }
 
     function sprint(string memory raceUpdateScreen, uint256 raceId) public {
-        string memory event_name = string(abi.encodePacked("SPRINT_", raceUpdateScreen));
-        require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
+        string memory event_name = string(
+            abi.encodePacked("SPRINT_", raceUpdateScreen)
+        );
+        require(
+            raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] ==
+                false,
+            "Already passed"
+        );
 
         raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = 3 * BPS;
         raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
@@ -533,20 +627,37 @@ contract BlockSheep is Ownable {
 
     function beginRace(uint256 raceId, int256 pointsWithBPS) external {
         string memory event_name = "RACE_START";
-        require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
+        require(
+            raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] ==
+                false,
+            "Already passed"
+        );
 
-        raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = pointsWithBPS;
+        raceUpdateBonusMalusPoints[raceId][event_name][
+            msg.sender
+        ] = pointsWithBPS;
         raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
     }
 
-    function saveBonus(uint256 raceId, int256 pointsWithBPS, string memory gameScreen) external {
-        string memory event_name = string(abi.encodePacked("BONUS_", gameScreen));
-        require(raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] == false, "Already passed");
+    function saveBonus(
+        uint256 raceId,
+        int256 pointsWithBPS,
+        string memory gameScreen
+    ) external {
+        string memory event_name = string(
+            abi.encodePacked("BONUS_", gameScreen)
+        );
+        require(
+            raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] ==
+                false,
+            "Already passed"
+        );
 
-        raceUpdateBonusMalusPoints[raceId][event_name][msg.sender] = pointsWithBPS;
+        raceUpdateBonusMalusPoints[raceId][event_name][
+            msg.sender
+        ] = pointsWithBPS;
         raceUpdateBonusMalusPointsOfUser[raceId][event_name][msg.sender] = true;
     }
-
 
     function staticCallAnyGameFunction(
         string memory gameName,
@@ -555,7 +666,9 @@ contract BlockSheep is Ownable {
         address target = targetContracts[gameName];
         require(target != address(0), "Game not found");
 
-        (bool success, bytes memory result) = target.staticcall(functionSignature);
+        (bool success, bytes memory result) = target.staticcall(
+            functionSignature
+        );
         require(success, "Static call failed");
 
         return result;

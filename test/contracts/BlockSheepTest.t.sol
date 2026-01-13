@@ -1,17 +1,16 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-import { Test } from "forge-std/Test.sol";
-import { console } from "forge-std/console.sol";
+import {Test} from "forge-std/Test.sol";
+import {console} from "forge-std/console.sol";
 
-import { BlockSheep } from "../../src/BlockSheep.sol";
-import { MockUSDC } from "../../src/MockUSDC.sol";
+import {BlockSheep} from "../../src/BlockSheep.sol";
+import {MockUSDC} from "../../src/MockUSDC.sol";
 
 // game contracts
-import { GameBullrun } from "../../src/GameBullrun.sol";
-import { GameRabbitHole } from"../../src/GameRabbitHole.sol";
-import { GameUnderdog } from "../../src/GameUnderdog.sol";
-
+import {GameBullrun} from "../../src/GameBullrun.sol";
+import {GameRabbitHole} from "../../src/GameRabbitHole.sol";
+import {GameUnderdog} from "../../src/GameUnderdog.sol";
 
 contract BlockSheepTest is Test {
     BlockSheep bls;
@@ -27,7 +26,6 @@ contract BlockSheepTest is Test {
 
     uint8 decimals = 1;
 
-
     string[] screens; // screens sequence
     int256[3][3] points; // for bullrun
     GameUnderdog.QuestionInfo[] questions; // for underdog;
@@ -35,21 +33,16 @@ contract BlockSheepTest is Test {
     function setUp() public {
         vm.prank(owner);
 
-        bls = new BlockSheep(
-            owner
-        );
-
-
+        bls = new BlockSheep(owner);
 
         // register games
-        GameUnderdog   underdog   = new GameUnderdog();
+        GameUnderdog underdog = new GameUnderdog();
         GameRabbitHole rabbitHole = new GameRabbitHole();
-        GameBullrun    bullrun    = new GameBullrun();
+        GameBullrun bullrun = new GameBullrun();
 
-        bls.registerContract("UNDERDOG",   address(underdog));
+        bls.registerContract("UNDERDOG", address(underdog));
         bls.registerContract("RABBITHOLE", address(rabbitHole));
-        bls.registerContract("BULLRUN",    address(bullrun));
-
+        bls.registerContract("BULLRUN", address(bullrun));
 
         // screens setup
         screens = new string[](1);
@@ -67,32 +60,30 @@ contract BlockSheepTest is Test {
 
         questions[0].content = "Question content 1";
         questions[0].answers = new string[](2);
-        questions[0].answers[0] = "Answer 1"; 
+        questions[0].answers[0] = "Answer 1";
         questions[0].answers[1] = "Answer 2";
         questions[0].imgUrl = "url1";
     }
-
 
     function testRegisterAndRaceCreation() public {
         // grant admin role
         vm.prank(owner);
         bls.setAdminRights(user1, true);
 
-        // validate the admin role 
+        // validate the admin role
         assertTrue(bls.userHasAdminAccess(user1));
 
         // add the race finally :)
         vm.startPrank(owner);
         bls.addRace(
             0,
-            1, 
-            2, 
+            1,
+            2,
             0,
-            screens, 
+            screens,
             abi.encode(points), // for bullrun init
             abi.encode(questions) // for underdog init
         );
-
 
         // register
         bls.register(0, user1); // 0 - is the id of the first race
@@ -101,7 +92,6 @@ contract BlockSheepTest is Test {
         // verify the user registration result
         assertTrue(bls.isPlayerRegistered(0, user1));
     }
-
 
     function test_Revert_When_RefundingOnNotFinishedRace() public {
         // grant admin role
@@ -112,15 +102,14 @@ contract BlockSheepTest is Test {
         vm.startPrank(user1);
         bls.addRace(
             0,
-            1, 
-            2, 
+            1,
+            2,
             0,
-            screens, 
+            screens,
             abi.encode(points), // for bullrun init
             abi.encode(questions) // for underdog init
         );
         vm.stopPrank();
-
 
         // register
         vm.startPrank(owner);
@@ -128,13 +117,17 @@ contract BlockSheepTest is Test {
 
         vm.expectRevert();
         bls.refundWinningBalance(0); // 0 - is the id of the first race
-        
+
         vm.stopPrank();
     }
 
-
     function test_Distribute() public {
-        uint8[4] memory entryPrices = [uint8(10), uint8(5), uint8(2), uint8(1)];
+        uint256[4] memory entryPrices = [
+            uint256(10000000),
+            uint256(5000000),
+            uint256(2000000),
+            uint256(1000000)
+        ]; // with 6 decimals
 
         for (uint256 e = 0; e < entryPrices.length; e++) {
             uint256 entryPrice = entryPrices[e];
@@ -142,7 +135,7 @@ contract BlockSheepTest is Test {
             vm.startPrank(owner);
 
             bls.addRace(
-                uint8(entryPrice),
+                entryPrice,
                 1,
                 7,
                 0,
@@ -172,34 +165,48 @@ contract BlockSheepTest is Test {
             uint256 raceId = e;
 
             // tests performs with 7 registered users
-            if (entryPrice == 10) {
-                assertEq(bls.possibleRefundingAmount(raceId, user1), 3600);
-                assertEq(bls.possibleRefundingAmount(raceId, user2), 1500);
-                assertEq(bls.possibleRefundingAmount(raceId, user3), 1100);
+            // Multipliers for 7 players: [514, 214, 157, 0, 0, 0, 0], houseCut: 114
+            // totalPool = entryPrice * 7
+            // Integer division causes rounding losses
+            if (entryPrice == 10000000) {
+                // (70000000 * 514) / 1000 = 35980000
+                assertEq(bls.possibleRefundingAmount(raceId, user1), 35980000);
+                // (70000000 * 214) / 1000 = 14980000
+                assertEq(bls.possibleRefundingAmount(raceId, user2), 14980000);
+                // (70000000 * 157) / 1000 = 10990000
+                assertEq(bls.possibleRefundingAmount(raceId, user3), 10990000);
                 assertEq(bls.possibleRefundingAmount(raceId, user4), 0);
             }
 
-            if (entryPrice == 5) {
-                assertEq(bls.possibleRefundingAmount(raceId, user1), 1800);
-                assertEq(bls.possibleRefundingAmount(raceId, user2), 750);
-                assertEq(bls.possibleRefundingAmount(raceId, user3), 550);
+            if (entryPrice == 5000000) {
+                // (35000000 * 514) / 1000 = 17990000
+                assertEq(bls.possibleRefundingAmount(raceId, user1), 17990000);
+                // (35000000 * 214) / 1000 = 7490000
+                assertEq(bls.possibleRefundingAmount(raceId, user2), 7490000);
+                // (35000000 * 157) / 1000 = 5495000
+                assertEq(bls.possibleRefundingAmount(raceId, user3), 5495000);
                 assertEq(bls.possibleRefundingAmount(raceId, user4), 0);
             }
 
-            if (entryPrice == 2) {
-                assertEq(bls.possibleRefundingAmount(raceId, user1), 720);
-                assertEq(bls.possibleRefundingAmount(raceId, user2), 300);
-                assertEq(bls.possibleRefundingAmount(raceId, user3), 220);
+            if (entryPrice == 2000000) {
+                // (14000000 * 514) / 1000 = 7196000
+                assertEq(bls.possibleRefundingAmount(raceId, user1), 7196000);
+                // (14000000 * 214) / 1000 = 2996000
+                assertEq(bls.possibleRefundingAmount(raceId, user2), 2996000);
+                // (14000000 * 157) / 1000 = 2198000
+                assertEq(bls.possibleRefundingAmount(raceId, user3), 2198000);
                 assertEq(bls.possibleRefundingAmount(raceId, user4), 0);
             }
 
-            if (entryPrice == 1) {
-                assertEq(bls.possibleRefundingAmount(raceId, user1), 360);
-                assertEq(bls.possibleRefundingAmount(raceId, user2), 150);
-                assertEq(bls.possibleRefundingAmount(raceId, user3), 110);
+            if (entryPrice == 1000000) {
+                // (7000000 * 514) / 1000 = 3598000
+                assertEq(bls.possibleRefundingAmount(raceId, user1), 3598000);
+                // (7000000 * 214) / 1000 = 1498000
+                assertEq(bls.possibleRefundingAmount(raceId, user2), 1498000);
+                // (7000000 * 157) / 1000 = 1099000
+                assertEq(bls.possibleRefundingAmount(raceId, user3), 1099000);
                 assertEq(bls.possibleRefundingAmount(raceId, user4), 0);
             }
         }
     }
-
 }
