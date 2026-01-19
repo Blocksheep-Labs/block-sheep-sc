@@ -4,6 +4,7 @@ pragma solidity ^0.8.20;
 import { Ownable } from "@openzeppelin/contracts/access/Ownable.sol";
 import { SafeERC20 } from "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
 import { IERC20 } from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Strings } from "@openzeppelin/contracts/utils/Strings.sol";
 import { IGameInterface } from "./IGameInterface.sol";
 
 
@@ -70,7 +71,7 @@ contract BlockSheep is Ownable {
     }
 
     event Registered(address user, uint256 amount);
-    event Withdrawed(address user, uint256 amount);
+    event Withdrawed(address user, uint256 amount, string raceId);
     event RaceCreated(); // TODO: update
 
     constructor(address owner) Ownable(owner) {
@@ -83,7 +84,7 @@ contract BlockSheep is Ownable {
             "Access denied"
         );
 
-        emit Withdrawed(withdrawTo, amount);
+        emit Withdrawed(withdrawTo, amount, "house");
         house -= amount;
     }
 
@@ -179,7 +180,7 @@ contract BlockSheep is Ownable {
 
             if (payout > 0) {
                 raceWithdrawals[raceId][sortedUsers[rank]] = payout;
-                emit Withdrawed(sortedUsers[rank], payout);
+                emit Withdrawed(sortedUsers[rank], payout, Strings.toString(raceId));
             }
 
             if (!houseCalculated[raceId]) {
