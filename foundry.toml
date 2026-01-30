@@ -5,9 +5,12 @@ libs = ['lib']
 gas_reports = ["*"]
 optimizer = true
 optimizer_runs = 20000
+viaIr = true
 fs_permissions = [
   { access = "read", path = "lib/foundry-chainlink-toolkit/out" },
 ]
+evm_version = 'shanghai'
+
 
 # Remappings in remappings.txt
 remappings = ['@openzeppelin/contracts/=lib/openzeppelin-contracts/contracts/']
